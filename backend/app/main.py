@@ -1,3 +1,4 @@
+from app.routers.operacion import router as operacion_router
 from app.routers.reservas import router as reservas_router
 from fastapi import FastAPI
 from starlette.exceptions import HTTPException
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(BusinessError, business_exception_handler)
     app.include_router(health_router)
+    app.include_router(operacion_router)
     app.include_router(reservas_router)
     app.include_router(catalogo_router)
     return app
