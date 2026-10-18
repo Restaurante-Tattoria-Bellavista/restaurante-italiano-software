@@ -22,9 +22,27 @@ async function request(path, options = {}) {
     )
 
     if (!response.ok) {
+      let mensajeServidor = ''
+
+      try {
+        const errorData = await response.json()
+
+        mensajeServidor =
+          errorData?.detail ||
+          errorData?.message ||
+          ''
+      } catch {
+        mensajeServidor = ''
+      }
+
       throw new Error(
-        `El servidor respondió con estado ${response.status}.`,
+        mensajeServidor ||
+          `El servidor respondió con estado ${response.status}.`,
       )
+    }
+
+    if (response.status === 204) {
+      return null
     }
 
     return await response.json()
@@ -32,6 +50,12 @@ async function request(path, options = {}) {
     if (error.name === 'AbortError') {
       throw new Error(
         'El backend tardó demasiado en responder.',
+      )
+    }
+
+    if (error instanceof TypeError) {
+      throw new Error(
+        'No fue posible establecer conexión con el backend.',
       )
     }
 
@@ -52,5 +76,23 @@ export const api = {
     }
 
     return data
+  },
+
+  getClientes() {
+    return request('/api/clientes')
+  },
+
+  createCliente(datos) {
+    return request('/api/clientes', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    })
+  },
+
+  updateCliente(clienteId, datos) {
+    return request(`/api/clientes/${clienteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(datos),
+    })
   },
 }
