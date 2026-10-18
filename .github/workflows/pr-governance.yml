@@ -1,0 +1,95 @@
+name: Validar flujo de ramas y Pull Request
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - test
+      - prod
+      - main
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  validar-pull-request:
+    name: Validar Pull Request
+    runs-on: ubuntu-latest
+
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_REF: ${{ github.head_ref }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+
+    steps:
+      - name: Mostrar información del Pull Request
+        shell: bash
+        run: |
+          echo "Rama de origen: $HEAD_REF"
+          echo "Rama de destino: $BASE_REF"
+
+      - name: Validar flujo entre ramas
+        shell: bash
+        run: |
+          flujo_valido=false
+
+          case "$BASE_REF" in
+            dev)
+              if [[ "$HEAD_REF" =~ ^(feature|fix|chore|docs)/.+$ ]]; then
+                flujo_valido=true
+              fi
+              ;;
+
+            test)
+              if [[ "$HEAD_REF" == "dev" ]]; then
+                flujo_valido=true
+              fi
+              ;;
+
+            prod)
+              if [[ "$HEAD_REF" == "test" ]] ||
+                 [[ "$HEAD_REF" =~ ^hotfix/.+$ ]]; then
+                flujo_valido=true
+              fi
+              ;;
+
+            main)
+              if [[ "$HEAD_REF" == "prod" ]]; then
+                flujo_valido=true
+              fi
+              ;;
+          esac
+
+          if [[ "$flujo_valido" != "true" ]]; then
+            echo "::error::Flujo no permitido: $HEAD_REF → $BASE_REF"
+            echo "Flujos permitidos:"
+            echo "feature/*, fix/*, chore/* o docs/* → dev"
+            echo "dev → test"
+            echo "test → prod"
+            echo "hotfix/* → prod"
+            echo "prod → main"
+            exit 1
+          fi
+
+          echo "Flujo de ramas válido: $HEAD_REF → $BASE_REF"
+
+      - name: Validar referencia a una HU
+        if: github.base_ref == 'dev'
+        shell: bash
+        run: |
+          contenido="$PR_TITLE $PR_BODY"
+
+          if [[ "$contenido" =~ HU-[0-9]+ ]] ||
+             [[ "$contenido" =~ \#[0-9]+ ]]; then
+            echo "El Pull Request contiene una referencia válida."
+          else
+            echo "::error::El título o la descripción debe mencionar una HU o una Issue."
+            echo "Ejemplos: HU-01, Closes #1 o Fixes #1"
+            exit 1
+          fi
