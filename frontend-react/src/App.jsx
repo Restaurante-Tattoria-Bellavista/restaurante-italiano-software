@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
+import ClientesPage from './pages/ClientesPage'
 import ModulePage from './pages/ModulePage'
 import { api } from './services/api'
 
@@ -10,7 +11,7 @@ const modulos = {
     titulo: 'Gestión de mesas',
     descripcion:
       'Administra la capacidad, ubicación y disponibilidad de las mesas.',
-    icono: '▦',
+    icono: '◦',
   },
   pedidos: {
     etiqueta: 'SERVICIO',
@@ -24,14 +25,14 @@ const modulos = {
     titulo: 'Gestión de reservas',
     descripcion:
       'Organiza las reservas y la disponibilidad de las mesas.',
-    icono: '◷',
+    icono: '◇',
   },
   productos: {
     etiqueta: 'MENÚ',
     titulo: 'Productos del restaurante',
     descripcion:
       'Mantén actualizada la oferta de productos disponibles.',
-    icono: '◇',
+    icono: '◈',
   },
   clientes: {
     etiqueta: 'CLIENTES',
@@ -105,32 +106,32 @@ function App() {
   }
 
   useEffect(() => {
-  let componenteActivo = true
+    let componenteActivo = true
 
-  async function comprobarConexionInicial() {
-    try {
-      await api.health()
+    async function comprobarConexionInicial() {
+      try {
+        await api.health()
 
-      if (componenteActivo) {
-        setConectado(true)
-      }
-    } catch {
-      if (componenteActivo) {
-        setConectado(false)
-      }
-    } finally {
-      if (componenteActivo) {
-        setVerificando(false)
+        if (componenteActivo) {
+          setConectado(true)
+        }
+      } catch {
+        if (componenteActivo) {
+          setConectado(false)
+        }
+      } finally {
+        if (componenteActivo) {
+          setVerificando(false)
+        }
       }
     }
-  }
 
-  comprobarConexionInicial()
+    comprobarConexionInicial()
 
-  return () => {
-    componenteActivo = false
-  }
-}, [])
+    return () => {
+      componenteActivo = false
+    }
+  }, [])
 
   useEffect(() => {
     const intervalo = window.setInterval(() => {
@@ -144,6 +145,14 @@ function App() {
 
   const modulo =
     modulos[vistaActual] || modulos.mesas
+
+  function mostrarContenido() {
+    if (vistaActual === 'clientes') {
+      return <ClientesPage />
+    }
+
+    return <ModulePage {...modulo} />
+  }
 
   return (
     <div className="app-shell">
@@ -175,8 +184,7 @@ function App() {
               <h1>{modulo.titulo}</h1>
 
               <p className="page-subtitle">
-                Controla tu restaurante y crea grandes
-                experiencias.
+                {modulo.descripcion}
               </p>
             </div>
           </div>
@@ -222,7 +230,7 @@ function App() {
           reintentar={verificarConexion}
         />
 
-        <ModulePage {...modulo} />
+        {mostrarContenido()}
       </main>
     </div>
   )
