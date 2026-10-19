@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import MesaDialog from '../components/MesaDialog'
+import MesasPlanoSection from '../components/MesasPlanoSection'
 import { api } from '../services/api'
 
 const nombresEstados = {
@@ -36,6 +37,7 @@ function ordenarMesas(lista) {
   return [...lista].sort(
     (mesaA, mesaB) =>
       Number(mesaA.numero) - Number(mesaB.numero),
+    <MesasPlanoSection mesas={mesas} />
   )
 }
 
@@ -87,7 +89,7 @@ function MesasPage() {
       window.clearTimeout(temporizador)
     }
   }, [])
-  
+
   function abrirCreacion() {
     setMesaSeleccionada(null)
     setMostrarFormulario(true)
