@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
 import ClientesPage from './pages/ClientesPage'
-import ConfiguracionPage from './pages/ConfiguracionPage'
 import MenuPage from './pages/MenuPage'
 import MesasPage from './pages/MesasPage'
 import ModulePage from './pages/ModulePage'
-import ReportesPage from './pages/ReportesPage'
 import { api } from './services/api'
 
 const modulos = {
@@ -88,25 +86,19 @@ function formatearHora(fecha) {
 function App() {
   const [vistaActual, setVistaActual] =
     useState('mesas')
-
   const [menuAbierto, setMenuAbierto] =
     useState(false)
-
   const [conectado, setConectado] =
     useState(false)
-
   const [verificando, setVerificando] =
     useState(true)
-
   const [fechaActual, setFechaActual] =
     useState(() => new Date())
 
   async function verificarConexion() {
     try {
       setVerificando(true)
-
       await api.health()
-
       setConectado(true)
     } catch {
       setConectado(false)
@@ -156,11 +148,6 @@ function App() {
   const modulo =
     modulos[vistaActual] || modulos.mesas
 
-  function cambiarVista(nuevaVista) {
-    setVistaActual(nuevaVista)
-    setMenuAbierto(false)
-  }
-
   function mostrarContenido() {
     if (vistaActual === 'mesas') {
       return <MesasPage />
@@ -174,22 +161,13 @@ function App() {
       return <MenuPage />
     }
 
-    if (vistaActual === 'reportes') {
-      return <ReportesPage />
-    }
-
-    if (vistaActual === 'configuracion') {
-      return <ConfiguracionPage />
-    }
-
     return <ModulePage {...modulo} />
   }
-
   return (
     <div className="app-shell">
       <Sidebar
         vistaActual={vistaActual}
-        cambiarVista={cambiarVista}
+        cambiarVista={setVistaActual}
         abierto={menuAbierto}
         cerrar={() => setMenuAbierto(false)}
         conectado={conectado}
