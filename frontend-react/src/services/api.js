@@ -97,7 +97,24 @@ export const api = {
   },
 
   getProductos() {
-    return request('/api/productos')
+    return request('/api/v1/productos')
+  },
+
+  createProducto(datos) {
+    return request('/api/v1/productos', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    })
+  },
+
+  updateProducto(productoId, datos) {
+    return request(
+      `/api/v1/productos/${productoId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(datos),
+      },
+    )
   },
 
   createProducto(datos) {

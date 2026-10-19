@@ -210,9 +210,9 @@ function MenuPage() {
     try {
       setProcesandoId(producto.id)
 
-      await api.updateProducto(producto.id, {
-        activo: nuevoEstado,
-      })
+        await api.updateProducto(producto.id, {
+        disponible: nuevoEstado,
+        })
 
       await cargarProductos({
         mostrarCarga: false,
