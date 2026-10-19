@@ -37,7 +37,6 @@ function ordenarMesas(lista) {
   return [...lista].sort(
     (mesaA, mesaB) =>
       Number(mesaA.numero) - Number(mesaB.numero),
-    <MesasPlanoSection mesas={mesas} />
   )
 }
 
@@ -89,7 +88,7 @@ function MesasPage() {
       window.clearTimeout(temporizador)
     }
   }, [])
-
+  
   function abrirCreacion() {
     setMesaSeleccionada(null)
     setMostrarFormulario(true)
@@ -304,7 +303,8 @@ function MesasPage() {
           <small>Actualmente en servicio</small>
         </article>
       </section>
-
+      
+    <MesasPlanoSection mesas={mesas} />
       <section className="content-card">
         <div className="section-toolbar">
           <div>

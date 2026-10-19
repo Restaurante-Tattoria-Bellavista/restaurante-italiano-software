@@ -9,6 +9,7 @@ from app.core.errors import (
     validation_exception_handler,
 )
 from app.routers.health import router as health_router
+from app.routers.catalogo import router as catalogo_router
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(BusinessError, business_exception_handler)
     app.include_router(health_router)
+    app.include_router(catalogo_router)
     return app
 
 
