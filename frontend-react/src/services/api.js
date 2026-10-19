@@ -116,5 +116,21 @@ export const api = {
       },
     )
    },
+  getMesas() {
+    return request('/api/v1/mesas')
+  },
 
+  createMesa(datos) {
+    return request('/api/v1/mesas', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    })
+  },
+
+  updateMesa(mesaId, datos) {
+    return request(`/api/v1/mesas/${mesaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(datos),
+    })
+  },
    }
