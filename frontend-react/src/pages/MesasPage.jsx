@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import MesaDialog from '../components/MesaDialog'
+import MesasPlanoSection from '../components/MesasPlanoSection'
 import { api } from '../services/api'
 
 const nombresEstados = {
@@ -302,7 +303,8 @@ function MesasPage() {
           <small>Actualmente en servicio</small>
         </article>
       </section>
-
+      
+    <MesasPlanoSection mesas={mesas} />
       <section className="content-card">
         <div className="section-toolbar">
           <div>

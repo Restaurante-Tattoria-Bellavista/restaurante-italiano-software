@@ -133,4 +133,19 @@ export const api = {
       body: JSON.stringify(datos),
     })
   },
+    getMesaLayout(mesaId) {
+    return request(
+      `/api/v1/mesas/${mesaId}/layout`,
+    )
+  },
+
+  saveMesaLayout(mesaId, datos) {
+    return request(
+      `/api/v1/mesas/${mesaId}/layout`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(datos),
+      },
+    )
+  },
    }
