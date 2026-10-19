@@ -115,7 +115,8 @@ export const api = {
         body: JSON.stringify(datos),
       },
     )
-   },
+  },
+
   getMesas() {
     return request('/api/v1/mesas')
   },
@@ -133,7 +134,8 @@ export const api = {
       body: JSON.stringify(datos),
     })
   },
-    getMesaLayout(mesaId) {
+
+  getMesaLayout(mesaId) {
     return request(
       `/api/v1/mesas/${mesaId}/layout`,
     )
@@ -148,4 +150,20 @@ export const api = {
       },
     )
   },
-   }
+
+  getConfiguracionRestaurante() {
+    return request(
+      '/api/v1/configuracion/restaurante',
+    )
+  },
+
+  updateConfiguracionRestaurante(datos) {
+    return request(
+      '/api/v1/configuracion/restaurante',
+      {
+        method: 'PUT',
+        body: JSON.stringify(datos),
+      },
+    )
+  },
+}
