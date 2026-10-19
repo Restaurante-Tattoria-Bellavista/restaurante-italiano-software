@@ -115,19 +115,6 @@ export const api = {
         body: JSON.stringify(datos),
       },
     )
-  },
+   },
 
-  createProducto(datos) {
-    return request('/api/productos', {
-      method: 'POST',
-      body: JSON.stringify(datos),
-    })
-  },
-
-  updateProducto(productoId, datos) {
-    return request(`/api/productos/${productoId}`, {
-      method: 'PUT',
-      body: JSON.stringify(datos),
-    })
-  },
-}
+   }
