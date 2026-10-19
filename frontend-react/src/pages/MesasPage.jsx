@@ -87,7 +87,7 @@ function MesasPage() {
       window.clearTimeout(temporizador)
     }
   }, [])
-  
+
   function abrirCreacion() {
     setMesaSeleccionada(null)
     setMostrarFormulario(true)
