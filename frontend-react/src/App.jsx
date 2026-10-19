@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
 import ClientesPage from './pages/ClientesPage'
+import MenuPage from './pages/MenuPage'
 import ModulePage from './pages/ModulePage'
 import { api } from './services/api'
 
@@ -146,13 +147,17 @@ function App() {
   const modulo =
     modulos[vistaActual] || modulos.mesas
 
-  function mostrarContenido() {
-    if (vistaActual === 'clientes') {
-      return <ClientesPage />
-    }
-
-    return <ModulePage {...modulo} />
+function mostrarContenido() {
+  if (vistaActual === 'clientes') {
+    return <ClientesPage />
   }
+
+  if (vistaActual === 'productos') {
+    return <MenuPage />
+  }
+
+  return <ModulePage {...modulo} />
+}
 
   return (
     <div className="app-shell">
