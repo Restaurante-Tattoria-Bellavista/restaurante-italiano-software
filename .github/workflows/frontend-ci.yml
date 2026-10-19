@@ -1,0 +1,58 @@
+name: Validar frontend React
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - test
+      - prod
+      - main
+    paths:
+      - "frontend-react/**"
+      - ".github/workflows/frontend-ci.yml"
+
+  push:
+    branches:
+      - dev
+      - test
+      - prod
+      - main
+    paths:
+      - "frontend-react/**"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validar-frontend:
+    name: Lint y build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend-react
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend-react/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Validar código
+        run: npm run lint
+
+      - name: Compilar aplicación
+        run: npm run build
