@@ -5,8 +5,9 @@ import {
 } from 'react'
 import { api } from '../services/api'
 
-const FORMULARIO_INICIAL = {
-  nombre: 'Trattoria Bellavista',
+const configuracionInicial = {
+  nombre: '',
+  especialidad: '',
   nit: '',
   telefono: '',
   correo: '',
@@ -14,84 +15,83 @@ const FORMULARIO_INICIAL = {
   ciudad: '',
   moneda: 'COP',
   zona_horaria: 'America/Bogota',
-  porcentaje_servicio: 10,
+  porcentaje_servicio: '10',
 }
 
 function normalizarConfiguracion(datos = {}) {
   return {
-    nombre:
-      datos.nombre ||
-      FORMULARIO_INICIAL.nombre,
-    nit:
-      datos.nit ||
-      FORMULARIO_INICIAL.nit,
-    telefono:
-      datos.telefono ||
-      FORMULARIO_INICIAL.telefono,
-    correo:
-      datos.correo ||
-      FORMULARIO_INICIAL.correo,
-    direccion:
-      datos.direccion ||
-      FORMULARIO_INICIAL.direccion,
-    ciudad:
-      datos.ciudad ||
-      FORMULARIO_INICIAL.ciudad,
-    moneda:
-      datos.moneda ||
-      FORMULARIO_INICIAL.moneda,
+    nombre: datos.nombre || '',
+    especialidad:
+      datos.especialidad || 'Cucina Italiana',
+    nit: datos.nit || '',
+    telefono: datos.telefono || '',
+    correo: datos.correo || '',
+    direccion: datos.direccion || '',
+    ciudad: datos.ciudad || '',
+    moneda: datos.moneda || 'COP',
     zona_horaria:
-      datos.zona_horaria ||
-      FORMULARIO_INICIAL.zona_horaria,
-    porcentaje_servicio: Number(
-      datos.porcentaje_servicio ??
-        FORMULARIO_INICIAL.porcentaje_servicio,
+      datos.zona_horaria || 'America/Bogota',
+    porcentaje_servicio: String(
+      datos.porcentaje_servicio ?? 10,
     ),
   }
 }
 
 function ConfiguracionPage() {
   const [formulario, setFormulario] = useState(
-    FORMULARIO_INICIAL,
+    configuracionInicial,
   )
+
+  const [configuracionOriginal, setConfiguracionOriginal] =
+    useState(configuracionInicial)
+
   const [errores, setErrores] = useState({})
   const [cargando, setCargando] = useState(true)
-  const [guardando, setGuardando] =
-    useState(false)
-  const [errorConsulta, setErrorConsulta] =
-    useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [sinConfiguracion, setSinConfiguracion] =
+    useState(false)
 
-  const cargarConfiguracion =
-    useCallback(async () => {
-      try {
-        setCargando(true)
-        setErrorConsulta('')
-        setMensaje('')
+  const cargarConfiguracion = useCallback(async () => {
+    try {
+      setCargando(true)
+      setError('')
+      setMensaje('')
+      setSinConfiguracion(false)
 
-        const datos =
-          await api.getConfiguracionRestaurante()
+      const datos =
+        await api.getConfiguracionRestaurante()
 
-        setFormulario(
-          normalizarConfiguracion(datos),
+      if (!datos) {
+        setSinConfiguracion(true)
+        setFormulario(configuracionInicial)
+        setConfiguracionOriginal(
+          configuracionInicial,
         )
-      } catch (err) {
-        setErrorConsulta(
-          err.message ||
-            'No fue posible consultar la configuración.',
-        )
-      } finally {
-        setCargando(false)
+
+        return
       }
-    }, [])
+
+      const configuracion =
+        normalizarConfiguracion(datos)
+
+      setFormulario(configuracion)
+      setConfiguracionOriginal(configuracion)
+    } catch (err) {
+      setError(
+        err.message ||
+          'No fue posible consultar la configuración.',
+      )
+    } finally {
+      setCargando(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const temporizador = window.setTimeout(
-      () => {
-        cargarConfiguracion()
-      },
-      0,
-    )
+    const temporizador = window.setTimeout(() => {
+      cargarConfiguracion()
+    }, 0)
 
     return () => {
       window.clearTimeout(temporizador)
@@ -103,10 +103,7 @@ function ConfiguracionPage() {
 
     setFormulario((datosActuales) => ({
       ...datosActuales,
-      [name]:
-        name === 'porcentaje_servicio'
-          ? value
-          : value,
+      [name]: value,
     }))
 
     setErrores((erroresActuales) => ({
@@ -128,31 +125,37 @@ function ConfiguracionPage() {
         'El nombre del restaurante es obligatorio.'
     }
 
-    if (!formulario.telefono.trim()) {
-      nuevosErrores.telefono =
-        'El teléfono es obligatorio.'
+    if (!formulario.especialidad.trim()) {
+      nuevosErrores.especialidad =
+        'La especialidad es obligatoria.'
     }
 
-    if (!formulario.correo.trim()) {
-      nuevosErrores.correo =
-        'El correo electrónico es obligatorio.'
-    } else if (
+    if (
+      formulario.correo.trim() &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        formulario.correo,
+        formulario.correo.trim(),
       )
     ) {
       nuevosErrores.correo =
         'Ingresa un correo electrónico válido.'
     }
 
-    if (!formulario.direccion.trim()) {
-      nuevosErrores.direccion =
-        'La dirección es obligatoria.'
+    if (
+      formulario.telefono.trim() &&
+      formulario.telefono.trim().length < 7
+    ) {
+      nuevosErrores.telefono =
+        'El teléfono debe tener mínimo 7 caracteres.'
     }
 
-    if (!formulario.ciudad.trim()) {
-      nuevosErrores.ciudad =
-        'La ciudad es obligatoria.'
+    if (!formulario.moneda) {
+      nuevosErrores.moneda =
+        'Selecciona una moneda.'
+    }
+
+    if (!formulario.zona_horaria) {
+      nuevosErrores.zona_horaria =
+        'Selecciona una zona horaria.'
     }
 
     if (
@@ -176,44 +179,59 @@ function ConfiguracionPage() {
       return
     }
 
+    const confirmado = window.confirm(
+      '¿Confirmas que deseas guardar los cambios de configuración del restaurante?',
+    )
+
+    if (!confirmado) {
+      return
+    }
+
+    const datosParaGuardar = {
+      nombre: formulario.nombre.trim(),
+      especialidad:
+        formulario.especialidad.trim(),
+      moneda: formulario.moneda,
+      nit: formulario.nit.trim() || null,
+      telefono:
+        formulario.telefono.trim() || null,
+      correo: formulario.correo.trim() || null,
+      direccion:
+        formulario.direccion.trim() || null,
+      ciudad: formulario.ciudad.trim() || null,
+      zona_horaria: formulario.zona_horaria,
+      porcentaje_servicio: Number(
+        formulario.porcentaje_servicio,
+      ),
+    }
+
     try {
       setGuardando(true)
-      setErrorConsulta('')
+      setError('')
       setMensaje('')
 
-      const datos = {
-        nombre: formulario.nombre.trim(),
-        nit: formulario.nit.trim() || null,
-        telefono: formulario.telefono.trim(),
-        correo: formulario.correo
-          .trim()
-          .toLowerCase(),
-        direccion: formulario.direccion.trim(),
-        ciudad: formulario.ciudad.trim(),
-        moneda: formulario.moneda,
-        zona_horaria:
-          formulario.zona_horaria,
-        porcentaje_servicio: Number(
-          formulario.porcentaje_servicio,
-        ),
-      }
-
-      const actualizada =
+      const respuesta =
         await api.updateConfiguracionRestaurante(
-          datos,
+          datosParaGuardar,
         )
 
-      setFormulario(
-        normalizarConfiguracion(
-          actualizada || datos,
-        ),
+      const configuracionActualizada =
+        normalizarConfiguracion({
+          ...datosParaGuardar,
+          ...(respuesta || {}),
+        })
+
+      setFormulario(configuracionActualizada)
+      setConfiguracionOriginal(
+        configuracionActualizada,
       )
+      setSinConfiguracion(false)
 
       setMensaje(
-        'La configuración fue guardada correctamente.',
+        'La configuración se guardó correctamente.',
       )
     } catch (err) {
-      setErrorConsulta(
+      setError(
         err.message ||
           'No fue posible guardar la configuración.',
       )
@@ -222,64 +240,104 @@ function ConfiguracionPage() {
     }
   }
 
+  function restaurarCambios() {
+    setFormulario(configuracionOriginal)
+    setErrores({})
+    setError('')
+    setMensaje('')
+  }
+
+  const existenCambios =
+    JSON.stringify(formulario) !==
+    JSON.stringify(configuracionOriginal)
+
   if (cargando) {
     return (
-      <div className="empty-state">
-        Cargando configuración...
-      </div>
+      <section
+        className="empty-state"
+        aria-live="polite"
+      >
+        <span className="loading-indicator" />
+
+        <h2>Cargando configuración</h2>
+
+        <p>
+          Estamos consultando la información general
+          del restaurante.
+        </p>
+      </section>
+    )
+  }
+
+  if (error && !formulario.nombre) {
+    return (
+      <section
+        className="empty-state"
+        role="alert"
+      >
+        <h2>
+          No fue posible cargar la configuración
+        </h2>
+
+        <p>{error}</p>
+
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={cargarConfiguracion}
+        >
+          Intentar nuevamente
+        </button>
+      </section>
+    )
+  }
+
+  if (sinConfiguracion) {
+    return (
+      <section className="empty-state">
+        <h2>No existe una configuración registrada</h2>
+
+        <p>
+          Puedes cargar los datos iniciales para
+          personalizar el restaurante.
+        </p>
+
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() =>
+            setSinConfiguracion(false)
+          }
+        >
+          Crear configuración
+        </button>
+      </section>
     )
   }
 
   return (
-    <section className="content-card config-page">
-      <div className="section-toolbar">
-        <div>
-          <p className="eyebrow">
-            INFORMACIÓN GENERAL
-          </p>
-
-          <h2>Configuración del restaurante</h2>
-
-          <p>
-            Personaliza la información de contacto y
-            los parámetros generales del sistema.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          className="button button-outline"
-          disabled={guardando}
-          onClick={cargarConfiguracion}
-        >
-          ↻ Recargar
-        </button>
+    <div className="config-page">
+      <div className="message-action warning">
+        La persistencia de los campos de contacto
+        depende de la ampliación del contrato realizada
+        por el backend de HU-16.
       </div>
-
-      {errorConsulta && (
-        <div
-          className="form-message error"
-          role="alert"
-        >
-          <span>{errorConsulta}</span>
-
-          <button
-            type="button"
-            className="message-action"
-            disabled={guardando}
-            onClick={cargarConfiguracion}
-          >
-            Intentar nuevamente
-          </button>
-        </div>
-      )}
 
       {mensaje && (
         <div
-          className="form-message success"
+          className="message-action success"
           role="status"
         >
           {mensaje}
+        </div>
+      )}
+
+      {error && (
+        <div
+          className="message-action error"
+          role="alert"
+        >
+          {error}
         </div>
       )}
 
@@ -288,17 +346,18 @@ function ConfiguracionPage() {
         onSubmit={guardarConfiguracion}
         noValidate
       >
-        <div className="config-section">
+        <section className="config-section">
           <div className="config-section-heading">
             <span className="config-section-number">
               01
             </span>
 
             <div>
-              <h3>Identidad del restaurante</h3>
+              <h2>Identidad del restaurante</h2>
+
               <p>
-                Información con la que se identifica
-                el establecimiento.
+                Información que identifica al
+                establecimiento.
               </p>
             </div>
           </div>
@@ -306,8 +365,7 @@ function ConfiguracionPage() {
           <div className="config-grid">
             <div className="form-field">
               <label htmlFor="config-nombre">
-                Nombre del restaurante
-                <span aria-hidden="true"> *</span>
+                Nombre del restaurante *
               </label>
 
               <input
@@ -331,6 +389,31 @@ function ConfiguracionPage() {
             </div>
 
             <div className="form-field">
+              <label htmlFor="config-especialidad">
+                Especialidad *
+              </label>
+
+              <input
+                id="config-especialidad"
+                name="especialidad"
+                type="text"
+                value={formulario.especialidad}
+                onChange={actualizarCampo}
+                disabled={guardando}
+                maxLength="100"
+                aria-invalid={Boolean(
+                  errores.especialidad,
+                )}
+              />
+
+              {errores.especialidad && (
+                <small className="field-error">
+                  {errores.especialidad}
+                </small>
+              )}
+            </div>
+
+            <div className="form-field">
               <label htmlFor="config-nit">
                 NIT
               </label>
@@ -343,23 +426,23 @@ function ConfiguracionPage() {
                 onChange={actualizarCampo}
                 disabled={guardando}
                 maxLength="30"
-                placeholder="Ej. 900123456-7"
               />
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="config-section">
+        <section className="config-section">
           <div className="config-section-heading">
             <span className="config-section-number">
               02
             </span>
 
             <div>
-              <h3>Información de contacto</h3>
+              <h2>Información de contacto</h2>
+
               <p>
-                Datos utilizados para la comunicación
-                con clientes y proveedores.
+                Datos para la atención y ubicación del
+                restaurante.
               </p>
             </div>
           </div>
@@ -368,7 +451,6 @@ function ConfiguracionPage() {
             <div className="form-field">
               <label htmlFor="config-telefono">
                 Teléfono
-                <span aria-hidden="true"> *</span>
               </label>
 
               <input
@@ -379,7 +461,6 @@ function ConfiguracionPage() {
                 onChange={actualizarCampo}
                 disabled={guardando}
                 maxLength="30"
-                placeholder="Ej. +57 300 000 0000"
                 aria-invalid={Boolean(
                   errores.telefono,
                 )}
@@ -395,7 +476,6 @@ function ConfiguracionPage() {
             <div className="form-field">
               <label htmlFor="config-correo">
                 Correo electrónico
-                <span aria-hidden="true"> *</span>
               </label>
 
               <input
@@ -406,7 +486,6 @@ function ConfiguracionPage() {
                 onChange={actualizarCampo}
                 disabled={guardando}
                 maxLength="150"
-                placeholder="contacto@restaurante.com"
                 aria-invalid={Boolean(
                   errores.correo,
                 )}
@@ -422,7 +501,6 @@ function ConfiguracionPage() {
             <div className="form-field form-field-full">
               <label htmlFor="config-direccion">
                 Dirección
-                <span aria-hidden="true"> *</span>
               </label>
 
               <input
@@ -433,23 +511,12 @@ function ConfiguracionPage() {
                 onChange={actualizarCampo}
                 disabled={guardando}
                 maxLength="200"
-                placeholder="Dirección del establecimiento"
-                aria-invalid={Boolean(
-                  errores.direccion,
-                )}
               />
-
-              {errores.direccion && (
-                <small className="field-error">
-                  {errores.direccion}
-                </small>
-              )}
             </div>
 
             <div className="form-field">
               <label htmlFor="config-ciudad">
                 Ciudad
-                <span aria-hidden="true"> *</span>
               </label>
 
               <input
@@ -460,32 +527,23 @@ function ConfiguracionPage() {
                 onChange={actualizarCampo}
                 disabled={guardando}
                 maxLength="100"
-                placeholder="Ej. Bogotá"
-                aria-invalid={Boolean(
-                  errores.ciudad,
-                )}
               />
-
-              {errores.ciudad && (
-                <small className="field-error">
-                  {errores.ciudad}
-                </small>
-              )}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="config-section">
+        <section className="config-section">
           <div className="config-section-heading">
             <span className="config-section-number">
               03
             </span>
 
             <div>
-              <h3>Parámetros generales</h3>
+              <h2>Parámetros generales</h2>
+
               <p>
-                Valores utilizados en la operación
-                diaria del restaurante.
+                Valores utilizados durante la operación
+                del restaurante.
               </p>
             </div>
           </div>
@@ -493,7 +551,7 @@ function ConfiguracionPage() {
           <div className="config-grid">
             <div className="form-field">
               <label htmlFor="config-moneda">
-                Moneda
+                Moneda *
               </label>
 
               <select
@@ -504,20 +562,22 @@ function ConfiguracionPage() {
                 disabled={guardando}
               >
                 <option value="COP">
-                  Peso colombiano (COP)
+                  COP — Peso colombiano
                 </option>
+
                 <option value="USD">
-                  Dólar estadounidense (USD)
+                  USD — Dólar estadounidense
                 </option>
+
                 <option value="EUR">
-                  Euro (EUR)
+                  EUR — Euro
                 </option>
               </select>
             </div>
 
             <div className="form-field">
               <label htmlFor="config-zona">
-                Zona horaria
+                Zona horaria *
               </label>
 
               <select
@@ -528,13 +588,15 @@ function ConfiguracionPage() {
                 disabled={guardando}
               >
                 <option value="America/Bogota">
-                  Bogotá (UTC-5)
+                  America/Bogota
                 </option>
-                <option value="America/Mexico_City">
-                  Ciudad de México
-                </option>
+
                 <option value="America/Lima">
-                  Lima (UTC-5)
+                  America/Lima
+                </option>
+
+                <option value="America/Mexico_City">
+                  America/Mexico_City
                 </option>
               </select>
             </div>
@@ -549,14 +611,14 @@ function ConfiguracionPage() {
                   id="config-servicio"
                   name="porcentaje_servicio"
                   type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
                   value={
                     formulario.porcentaje_servicio
                   }
                   onChange={actualizarCampo}
                   disabled={guardando}
+                  min="0"
+                  max="100"
+                  step="0.01"
                   aria-invalid={Boolean(
                     errores.porcentaje_servicio,
                   )}
@@ -567,25 +629,31 @@ function ConfiguracionPage() {
 
               {errores.porcentaje_servicio && (
                 <small className="field-error">
-                  {
-                    errores.porcentaje_servicio
-                  }
+                  {errores.porcentaje_servicio}
                 </small>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="config-actions">
-          <p>
-            Los campos marcados con * son
-            obligatorios.
-          </p>
+          <button
+            type="button"
+            className="button button-outline"
+            disabled={
+              guardando || !existenCambios
+            }
+            onClick={restaurarCambios}
+          >
+            Descartar cambios
+          </button>
 
           <button
             type="submit"
             className="button button-primary"
-            disabled={guardando}
+            disabled={
+              guardando || !existenCambios
+            }
           >
             {guardando
               ? 'Guardando...'
@@ -593,7 +661,7 @@ function ConfiguracionPage() {
           </button>
         </div>
       </form>
-    </section>
+    </div>
   )
 }
 

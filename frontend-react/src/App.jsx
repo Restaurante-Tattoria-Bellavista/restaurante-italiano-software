@@ -6,6 +6,7 @@ import ConfiguracionPage from './pages/ConfiguracionPage'
 import MenuPage from './pages/MenuPage'
 import MesasPage from './pages/MesasPage'
 import ModulePage from './pages/ModulePage'
+import ReportesPage from './pages/ReportesPage'
 import { api } from './services/api'
 
 const modulos = {
@@ -171,6 +172,10 @@ function App() {
 
     if (vistaActual === 'productos') {
       return <MenuPage />
+    }
+
+    if (vistaActual === 'reportes') {
+      return <ReportesPage />
     }
 
     if (vistaActual === 'configuracion') {
