@@ -2,9 +2,9 @@
 
 **Proyecto:** Trattoria Bellavista — Sistema de gestión de restaurante
 **Motor:** PostgreSQL 16
-**Historia de usuario:** HU-07 — Diseño del modelo entidad-relación (issue #3)
+**Historias de usuario:** HU-07 — Diseño del modelo entidad-relación (issue #3) y HU-09 — Persistencia de mesas, clientes y reservas (issue #9)
 **Responsable:** Fernando
-**Fuente:** modelos SQLAlchemy en `backend/app/models/`
+**Fuente:** `database/schema.sql`
 
 ---
 
@@ -230,6 +230,13 @@ Restricciones con nombre: `ck_mesa_layout_pos_x`, `ck_mesa_layout_pos_y`, `ck_me
 
 Restricciones con nombre: `ck_reservas_personas_positivas`, `ck_reservas_estado_valido`.
 
+Reglas agregadas en la HU-09:
+
+- `ex_reservas_mesa_franja`: una mesa no puede tener dos reservas activas (`PENDIENTE`, `CONFIRMADA` o `EN_MESA`) con menos de 2 horas de diferencia. Es la misma ventana que usa el backend. Las reservas canceladas, completadas o en las que el cliente no asistió no bloquean la mesa.
+- `tg_reservas_capacidad`: el número de personas no puede superar la capacidad de la mesa.
+- `tg_mesas_capacidad` (en `mesas`): no se puede bajar la capacidad de una mesa por debajo de una reserva activa que ya tiene.
+- `ix_reservas_mesa_fecha`: índice para buscar rápido las reservas activas de una mesa por fecha, que es la consulta de disponibilidad.
+
 ### 4.6. `productos`
 
 | Columna | Tipo | Restricciones | Valor por defecto | Descripción |
@@ -329,39 +336,40 @@ ABIERTO → EN_PREPARACION → LISTO → ENTREGADO → PAGADO
 
 ## 6. Decisiones de eliminación y desactivación
 
-Para no perder el historial de ventas y reservas, el modelo combina **desactivación** (la fila se conserva) y **borrado real** protegido por las claves foráneas.
+Para no perder el historial de ventas y reservas, la regla es **desactivar en vez de borrar**.
 
-Comportamiento verificado en `backend/app/services/` y `backend/app/repositories/`:
-
-| Tabla | Qué hace `DELETE` en la API | Tipo | Protección de la base de datos |
-|---|---|---|---|
-| `clientes` | `ClienteService.deactivate` pone `activo = false`. El cliente puede reactivarse. | **Desactivación** | La fila nunca se borra. Se conservan sus reservas. |
-| `mesas` | `MesaRepository.delete` ejecuta `db.delete(mesa)`. | **Borrado real** | Si la mesa tiene pedidos o reservas, PostgreSQL **lo impide** (RESTRICT). Si se borra, su `mesa_layout` se borra con ella (CASCADE). |
-| `productos` | `ProductoRepository.delete` ejecuta `db.delete(producto)`. | **Borrado real** | Si el producto ya aparece en un pedido, PostgreSQL **lo impide** (RESTRICT). |
-
-Para el resto de tablas no existe un endpoint de borrado y se usan estados:
+El backend actual (HU-14 y HU-15) no tiene endpoints para borrar mesas, clientes, productos ni reservas. Así se retira cada cosa:
 
 | Tabla | Cómo se retira un registro | Por qué |
 |---|---|---|
-| `mesas` (alternativa) | Desactivar (`activo = false`) o marcar `FUERA_DE_SERVICIO`. | Es la forma de retirar una mesa que **ya tiene historial**. |
-| `productos` (alternativa) | Marcar `disponible = false`. | Es la forma de retirar un producto que **ya se vendió**. |
-| `pedidos` | Se cambia a `CANCELADO`. | Conserva el historial. Si se borrara, se borrarían también sus líneas (CASCADE). |
-| `reservas` | Se cambia a `CANCELADA` o `NO_ASISTIO`. | La API no tiene un endpoint para borrar reservas. |
-| `detalle_pedido` | Se puede borrar una línea mientras el pedido está abierto. | Es parte de la edición normal del pedido. |
-| `mesa_layout` | Se borra automáticamente con su mesa (CASCADE). | No tiene sentido sin la mesa. |
+| `clientes` | `activo = false`. Se puede reactivar. | El backend no deja reservar a un cliente inactivo. Sus reservas anteriores se conservan. |
+| `mesas` | `activo = false` o estado `FUERA_DE_SERVICIO`. | El backend no deja reservar una mesa en ninguno de los dos casos. |
+| `productos` | `disponible = false`. | Deja de ofrecerse sin afectar los pedidos anteriores. |
+| `reservas` | Estado `CANCELADA` o `NO_ASISTIO`. | Conserva el historial y libera la mesa para esa franja. |
+| `pedidos` | Estado `CANCELADO`. | Conserva el historial. |
 
-> **Decisión de diseño:** los registros sin historial (una mesa o un producto recién creados por error) pueden borrarse. Los registros con historial se retiran por desactivación. Las reglas RESTRICT garantizan que el historial de pedidos y reservas nunca quede apuntando a una fila inexistente.
+Si aun así alguien intenta borrar desde la base de datos, las claves foráneas lo controlan:
+
+- **RESTRICT:** no se puede borrar una mesa con pedidos o reservas, un cliente con reservas, ni un producto que ya se vendió.
+- **CASCADE:** si se borra una mesa sin historial, se borra su posición en el plano; si se borra un pedido, se borran sus líneas.
+
+Los cambios de estado (por ejemplo, que una reserva solo pase de `PENDIENTE` a `CONFIRMADA` o `CANCELADA`) los controla el backend. La base de datos solo garantiza que el estado sea uno de los valores permitidos.
 
 ---
 
-## 7. Observaciones para las siguientes historias
+## 7. Observaciones
 
-Estas son reglas que el modelo actual **no** obliga desde la base de datos. Hoy dependen del backend. Se anotan para evaluarlas en HU-08 y HU-12:
+Reglas que ya se resolvieron en la base de datos:
 
-1. **Doble reserva:** nada impide crear dos reservas para la misma mesa a la misma hora.
-2. **Capacidad:** que `reservas.personas` no supere `mesas.capacidad` lo valida el backend, no la base de datos.
-3. **Totales:** que `subtotal = cantidad × precio_unitario` y que `pedidos.total` sea la suma de los subtotales lo calcula el backend.
-4. **Configuración única:** nada impide insertar más de una fila en `restaurante_config`.
-5. **`updated_at`:** se actualiza desde SQLAlchemy. Un `UPDATE` hecho directamente en SQL no lo cambia, porque no hay un trigger en la base de datos.
-6. **Reserva y pedido:** no hay una clave foránea que relacione la reserva con el pedido que se abre al sentar al cliente.
-7. **Error al borrar con historial (para backend):** ni `MesaService.delete` ni `ProductoService.delete` comprueban antes si existen pedidos o reservas relacionados. PostgreSQL rechaza el borrado con un `IntegrityError`. Hay que verificar que la API responda con un mensaje claro (por ejemplo, `409 Conflict`: «La mesa tiene pedidos registrados; desactívela en lugar de eliminarla») y no con un `500 Internal Server Error`.
+- **Doble reserva** (HU-09): la restricción `ex_reservas_mesa_franja` impide dos reservas activas de la misma mesa a menos de 2 horas.
+- **Capacidad** (HU-09): los triggers `tg_reservas_capacidad` y `tg_mesas_capacidad` impiden reservar más personas de las que caben.
+
+Reglas que todavía dependen del backend:
+
+1. **Totales:** que `subtotal = cantidad × precio_unitario` y que `pedidos.total` sea la suma de los subtotales lo calcula el backend. Se revisará en la HU-10.
+2. **Configuración única:** nada impide insertar más de una fila en `restaurante_config`.
+3. **`updated_at`:** el backend lo actualiza al modificar una fila. Un `UPDATE` hecho directamente en SQL no lo cambia, porque no hay trigger.
+4. **Reserva y pedido:** no hay una clave foránea que relacione la reserva con el pedido que se abre al sentar al cliente.
+5. **Mesa o cliente inactivos:** que no se pueda reservar con una mesa o un cliente inactivo lo valida el backend.
+
+Al aplicar `schema.sql` sobre una base que ya tiene datos, la restricción de doble reserva no se crea si ya existen reservas activas que se cruzan. En ese caso el script falla y no cambia nada; hay que cancelar o mover esas reservas y volver a ejecutarlo.
