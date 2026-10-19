@@ -3,6 +3,7 @@ import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
 import ClientesPage from './pages/ClientesPage'
 import MenuPage from './pages/MenuPage'
+import MesasPage from './pages/MesasPage'
 import ModulePage from './pages/ModulePage'
 import { api } from './services/api'
 
@@ -147,18 +148,21 @@ function App() {
   const modulo =
     modulos[vistaActual] || modulos.mesas
 
-function mostrarContenido() {
-  if (vistaActual === 'clientes') {
-    return <ClientesPage />
+  function mostrarContenido() {
+    if (vistaActual === 'mesas') {
+      return <MesasPage />
+    }
+
+    if (vistaActual === 'clientes') {
+      return <ClientesPage />
+    }
+
+    if (vistaActual === 'productos') {
+      return <MenuPage />
+    }
+
+    return <ModulePage {...modulo} />
   }
-
-  if (vistaActual === 'productos') {
-    return <MenuPage />
-  }
-
-  return <ModulePage {...modulo} />
-}
-
   return (
     <div className="app-shell">
       <Sidebar
