@@ -4,12 +4,14 @@
 -- Motor: PostgreSQL 16
 --
 -- Este script crea las 8 tablas del sistema en una base de datos vacía.
--- Reproduce exactamente el esquema que genera el backend con SQLAlchemy
--- (backend/app/models/ + backend/app/database/init_db.py): mismos tipos,
--- nulabilidad, valores por defecto, claves, restricciones e índices.
+-- Las tablas (secciones 1 a 8) se basan en los modelos SQLAlchemy del
+-- proyecto anterior: mismos tipos, nulabilidad, valores por defecto,
+-- claves, restricciones e índices.
+-- Las secciones 9 a 11 (HU-09) agregan reglas de integridad para las
+-- reservas que antes solo validaba el backend.
 --
--- Es idempotente: usa IF NOT EXISTS, así que puede ejecutarse varias veces
--- sin error y convive con Base.metadata.create_all() del backend.
+-- Es idempotente: usa IF NOT EXISTS y CREATE OR REPLACE, así que puede
+-- ejecutarse varias veces sin error.
 --
 -- No contiene credenciales. La conexión se configura con variables de
 -- entorno (ver database/README.md).
@@ -198,5 +200,122 @@ CREATE TABLE IF NOT EXISTS detalle_pedido (
 CREATE INDEX IF NOT EXISTS ix_detalle_pedido_id          ON detalle_pedido (id);
 CREATE INDEX IF NOT EXISTS ix_detalle_pedido_pedido_id   ON detalle_pedido (pedido_id);
 CREATE INDEX IF NOT EXISTS ix_detalle_pedido_producto_id ON detalle_pedido (producto_id);
+
+-- =====================================================================
+-- HU-09 — Reglas de integridad de mesas, clientes y reservas
+--
+-- El backend ya valida estas reglas antes de guardar. Aquí se repiten en
+-- la base de datos para que se cumplan también si alguien inserta datos
+-- por otro camino (un script, pgAdmin, un error en el código).
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 9. Una mesa no puede tener dos reservas activas a menos de 2 horas.
+--
+-- Es la misma regla del backend (routers/reservas.py, VENTANA = 2 horas).
+-- Cada reserva ocupa la franja [fecha_hora - 1h, fecha_hora + 1h). Dos
+-- franjas de la misma mesa se cruzan justo cuando las horas están a menos
+-- de 2 horas, y la restricción EXCLUDE no deja guardar la segunda.
+-- Solo cuentan las reservas activas: una cancelada, completada o en la que
+-- el cliente no asistió no bloquea la mesa.
+-- ---------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- PostgreSQL exige que las funciones usadas en una restricción sean
+-- IMMUTABLE. Restar o sumar horas a un timestamptz siempre da el mismo
+-- resultado, sin importar la zona horaria, así que la función es segura.
+CREATE OR REPLACE FUNCTION reserva_franja(fecha_hora timestamptz)
+RETURNS tstzrange
+LANGUAGE sql
+IMMUTABLE
+AS $$
+    SELECT tstzrange(fecha_hora - interval '1 hour',
+                     fecha_hora + interval '1 hour', '[)');
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ex_reservas_mesa_franja'
+    ) THEN
+        ALTER TABLE reservas
+            ADD CONSTRAINT ex_reservas_mesa_franja
+            EXCLUDE USING gist (
+                mesa_id WITH =,
+                reserva_franja(fecha_hora) WITH &&
+            )
+            WHERE (estado IN ('PENDIENTE', 'CONFIRMADA', 'EN_MESA'));
+    END IF;
+END;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 10. Las personas de una reserva no pueden superar la capacidad de la
+--     mesa. Como compara dos tablas distintas, no se puede hacer con un
+--     CHECK; se hace con un trigger que revisa antes de guardar.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION validar_capacidad_reserva()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_capacidad integer;
+BEGIN
+    SELECT capacidad INTO v_capacidad FROM mesas WHERE id = NEW.mesa_id;
+
+    -- Si la mesa no existe, la clave foránea es la que rechaza la fila.
+    IF v_capacidad IS NOT NULL AND NEW.personas > v_capacidad THEN
+        RAISE EXCEPTION
+            'La reserva es para % personas y la mesa % solo tiene capacidad para %',
+            NEW.personas, NEW.mesa_id, v_capacidad
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER tg_reservas_capacidad
+    BEFORE INSERT OR UPDATE OF mesa_id, personas ON reservas
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_capacidad_reserva();
+
+-- El caso contrario: no se puede bajar la capacidad de una mesa por
+-- debajo de una reserva activa que ya tiene.
+CREATE OR REPLACE FUNCTION validar_capacidad_mesa()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM reservas r
+        WHERE r.mesa_id = NEW.id
+          AND r.estado IN ('PENDIENTE', 'CONFIRMADA', 'EN_MESA')
+          AND r.personas > NEW.capacidad
+    ) THEN
+        RAISE EXCEPTION
+            'La mesa % tiene reservas activas para más de % personas',
+            NEW.id, NEW.capacidad
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER tg_mesas_capacidad
+    BEFORE UPDATE OF capacidad ON mesas
+    FOR EACH ROW
+    WHEN (NEW.capacidad < OLD.capacidad)
+    EXECUTE FUNCTION validar_capacidad_mesa();
+
+-- ---------------------------------------------------------------------
+-- 11. Índice para consultar la disponibilidad: reservas de una mesa en un
+--     rango de fechas (la consulta que hace el backend antes de reservar).
+-- ---------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS ix_reservas_mesa_fecha
+    ON reservas (mesa_id, fecha_hora)
+    WHERE estado IN ('PENDIENTE', 'CONFIRMADA', 'EN_MESA');
 
 COMMIT;

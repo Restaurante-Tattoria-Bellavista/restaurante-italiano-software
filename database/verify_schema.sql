@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Trattoria Bellavista — Verificación del esquema PostgreSQL
--- Historia de usuario: HU-08 (issue #4)
+-- Historias de usuario: HU-08 (issue #4) y HU-09 (issue #9)
 --
 -- Comprueba que database/schema.sql quedó bien aplicado:
 --   1. Que existan las 8 tablas, sus claves y sus índices.
@@ -165,6 +165,46 @@ CALL pg_temp.debe_fallar('Rechaza estado de reserva inválido',
 CALL pg_temp.debe_fallar('Rechaza reserva de cliente inexistente',
     $q$INSERT INTO reservas (mesa_id, cliente_id, fecha_hora, personas)
        VALUES (9001, 999999, now(), 2)$q$, '23503');
+
+-- HU-09: reservas que se cruzan y capacidad de la mesa.
+-- La reserva 9001 es para 2 personas en la mesa 9001 (capacidad 4).
+-- Códigos: 23P01 = choque con la restricción EXCLUDE, 23514 = regla violada.
+CALL pg_temp.debe_fallar('HU-09: rechaza otra reserva de la misma mesa 1 hora después',
+    $q$INSERT INTO reservas (id, mesa_id, cliente_id, fecha_hora, personas)
+       SELECT 9002, 9001, 9001, fecha_hora + interval '1 hour', 2
+       FROM reservas WHERE id = 9001$q$, '23P01');
+CALL pg_temp.debe_fallar('HU-09: rechaza otra reserva de la misma mesa 1 hora antes',
+    $q$INSERT INTO reservas (id, mesa_id, cliente_id, fecha_hora, personas)
+       SELECT 9002, 9001, 9001, fecha_hora - interval '1 hour 59 minutes', 2
+       FROM reservas WHERE id = 9001$q$, '23P01');
+CALL pg_temp.debe_funcionar('HU-09: permite la misma mesa 2 horas después',
+    $q$INSERT INTO reservas (id, mesa_id, cliente_id, fecha_hora, personas)
+       SELECT 9003, 9001, 9001, fecha_hora + interval '2 hours', 2
+       FROM reservas WHERE id = 9001$q$);
+CALL pg_temp.debe_funcionar('HU-09: permite otra mesa a la misma hora',
+    $q$INSERT INTO mesas (id, numero, capacidad) VALUES (9010, 9010, 2);
+       INSERT INTO reservas (id, mesa_id, cliente_id, fecha_hora, personas)
+       SELECT 9004, 9010, 9001, fecha_hora, 2
+       FROM reservas WHERE id = 9001$q$);
+CALL pg_temp.debe_funcionar('HU-09: una reserva cancelada no bloquea la mesa',
+    $q$INSERT INTO reservas (id, mesa_id, cliente_id, fecha_hora, personas, estado)
+       SELECT 9005, 9001, 9001, fecha_hora, 2, 'CANCELADA'
+       FROM reservas WHERE id = 9001$q$);
+CALL pg_temp.debe_fallar('HU-09: rechaza reactivar una reserva que se cruza',
+    $q$UPDATE reservas SET estado = 'PENDIENTE' WHERE id = 9005$q$, '23P01');
+CALL pg_temp.debe_fallar('HU-09: rechaza más personas que la capacidad de la mesa',
+    $q$INSERT INTO reservas (mesa_id, cliente_id, fecha_hora, personas)
+       SELECT 9001, 9001, fecha_hora + interval '10 hours', 5
+       FROM reservas WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_fallar('HU-09: rechaza subir las personas por encima de la capacidad',
+    $q$UPDATE reservas SET personas = 5 WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_fallar('HU-09: rechaza bajar la capacidad por debajo de una reserva activa',
+    $q$UPDATE mesas SET capacidad = 1 WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_funcionar('HU-09: permite bajar la capacidad si las reservas caben',
+    $q$UPDATE mesas SET capacidad = 3 WHERE id = 9001$q$);
+CALL pg_temp.debe_funcionar('HU-09: limpiar reservas de prueba',
+    $q$DELETE FROM reservas WHERE id IN (9003, 9004, 9005);
+       DELETE FROM mesas WHERE id = 9010$q$);
 
 -- Reglas al eliminar (RESTRICT y CASCADE).
 CALL pg_temp.debe_fallar('RESTRICT: no borra producto ya vendido',
