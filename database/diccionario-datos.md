@@ -2,7 +2,7 @@
 
 **Proyecto:** Trattoria Bellavista — Sistema de gestión de restaurante
 **Motor:** PostgreSQL 16
-**Historias de usuario:** HU-07 — Diseño del modelo entidad-relación (issue #3) y HU-09 — Persistencia de mesas, clientes y reservas (issue #9)
+**Historias de usuario:** HU-07 — Diseño del modelo entidad-relación (issue #3), HU-09 — Persistencia de mesas, clientes y reservas (issue #9) y HU-10 — Persistencia de productos y pedidos (issue #10)
 **Responsable:** Fernando
 **Fuente:** `database/schema.sql`
 
@@ -266,6 +266,12 @@ Restricciones con nombre: `ck_productos_precio_positivo`, `ck_productos_categori
 
 Restricciones con nombre: `ck_pedidos_estado_valido`, `ck_pedidos_total_no_negativo`.
 
+Reglas agregadas en la HU-10:
+
+- `ck_pedidos_fecha_cierre`: un pedido `PAGADO` o `CANCELADO` tiene `closed_at`, y uno activo no. La fecha de cierre no puede ser anterior a la de creación.
+- `uq_pedidos_mesa_activo`: una mesa solo puede tener un pedido activo (`ABIERTO`, `EN_PREPARACION`, `LISTO` o `ENTREGADO`) a la vez.
+- `tg_pedidos_total`: el total siempre es la suma de los subtotales de sus líneas. Si alguien intenta cambiarlo a mano, se vuelve a calcular.
+
 ### 4.8. `detalle_pedido`
 
 | Columna | Tipo | Restricciones | Valor por defecto | Descripción |
@@ -283,6 +289,18 @@ Restricciones con nombre: `ck_pedidos_estado_valido`, `ck_pedidos_total_no_negat
 Restricción única `uq_detalle_pedido_producto` sobre (`pedido_id`, `producto_id`): un producto aparece **una sola vez** por pedido. Para pedir más unidades se aumenta la `cantidad`.
 
 Otras restricciones con nombre: `ck_detalle_pedido_cantidad_positiva`, `ck_detalle_pedido_precio_positivo`, `ck_detalle_pedido_subtotal_positivo`.
+
+Reglas agregadas en la HU-10:
+
+- `ck_detalle_pedido_subtotal_correcto`: el subtotal es exactamente `cantidad × precio_unitario`.
+- `tg_detalle_pedido_abierto`: solo se pueden agregar, cambiar o quitar líneas de un pedido `ABIERTO`. Cuando el pedido pasa a cocina, se paga o se cancela, sus líneas quedan fijas.
+- `tg_detalle_pedido_total`: cada vez que cambia una línea, se recalcula el total del pedido.
+
+Para consultar un pedido completo (pedido, mesa, líneas y nombre de cada producto) está la vista `v_pedidos_detalle`:
+
+```sql
+SELECT * FROM v_pedidos_detalle WHERE pedido_id = 5;
+```
 
 ---
 
@@ -363,13 +381,14 @@ Reglas que ya se resolvieron en la base de datos:
 
 - **Doble reserva** (HU-09): la restricción `ex_reservas_mesa_franja` impide dos reservas activas de la misma mesa a menos de 2 horas.
 - **Capacidad** (HU-09): los triggers `tg_reservas_capacidad` y `tg_mesas_capacidad` impiden reservar más personas de las que caben.
+- **Totales** (HU-10): el subtotal de cada línea debe ser cantidad × precio y el total del pedido se recalcula solo.
+- **Un pedido por mesa** (HU-10): una mesa no puede tener dos pedidos activos.
 
 Reglas que todavía dependen del backend:
 
-1. **Totales:** que `subtotal = cantidad × precio_unitario` y que `pedidos.total` sea la suma de los subtotales lo calcula el backend. Se revisará en la HU-10.
-2. **Configuración única:** nada impide insertar más de una fila en `restaurante_config`.
-3. **`updated_at`:** el backend lo actualiza al modificar una fila. Un `UPDATE` hecho directamente en SQL no lo cambia, porque no hay trigger.
-4. **Reserva y pedido:** no hay una clave foránea que relacione la reserva con el pedido que se abre al sentar al cliente.
-5. **Mesa o cliente inactivos:** que no se pueda reservar con una mesa o un cliente inactivo lo valida el backend.
+1. **Configuración única:** nada impide insertar más de una fila en `restaurante_config`.
+2. **`updated_at`:** el backend lo actualiza al modificar una fila. Un `UPDATE` hecho directamente en SQL no lo cambia, porque no hay trigger.
+3. **Reserva y pedido:** no hay una clave foránea que relacione la reserva con el pedido que se abre al sentar al cliente.
+4. **Mesa o cliente inactivos:** que no se pueda reservar con una mesa o un cliente inactivo lo valida el backend.
 
-Al aplicar `schema.sql` sobre una base que ya tiene datos, la restricción de doble reserva no se crea si ya existen reservas activas que se cruzan. En ese caso el script falla y no cambia nada; hay que cancelar o mover esas reservas y volver a ejecutarlo.
+Al aplicar `schema.sql` sobre una base que ya tiene datos, las reglas nuevas no se pueden crear si hay datos que ya las incumplen (por ejemplo, reservas activas que se cruzan, dos pedidos activos en la misma mesa o una línea cuyo subtotal no cuadra). En ese caso el script falla y no cambia nada; hay que corregir esos datos y volver a ejecutarlo.
