@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Trattoria Bellavista — Verificación del esquema PostgreSQL
--- Historias de usuario: HU-08 (issue #4) y HU-09 (issue #9)
+-- Historias de usuario: HU-08 (issue #4), HU-09 (issue #9) y HU-10 (issue #10)
 --
 -- Comprueba que database/schema.sql quedó bien aplicado:
 --   1. Que existan las 8 tablas, sus claves y sus índices.
@@ -114,8 +114,8 @@ INSERT INTO _resultado (prueba, ok)
 SELECT 'Valores por defecto de mesas (LIBRE, activo = true)',
        estado = 'LIBRE' AND activo FROM mesas WHERE id = 9001;
 INSERT INTO _resultado (prueba, ok)
-SELECT 'Valores por defecto de pedidos (ABIERTO, total = 0)',
-       estado = 'ABIERTO' AND total = 0 FROM pedidos WHERE id = 9001;
+SELECT 'Valores por defecto de pedidos (ABIERTO, sin fecha de cierre)',
+       estado = 'ABIERTO' AND closed_at IS NULL FROM pedidos WHERE id = 9001;
 INSERT INTO _resultado (prueba, ok)
 SELECT 'Valores por defecto de mesa_layout (SALON, ROUND)',
        zona = 'SALON' AND forma = 'ROUND' FROM mesa_layout WHERE mesa_id = 9001;
@@ -150,8 +150,6 @@ CALL pg_temp.debe_fallar('Rechaza pedido en mesa inexistente',
     $q$INSERT INTO pedidos (mesa_id) VALUES (999999)$q$, '23503');
 CALL pg_temp.debe_fallar('Rechaza estado de pedido inválido',
     $q$UPDATE pedidos SET estado = 'PERDIDO' WHERE id = 9001$q$, '23514');
-CALL pg_temp.debe_fallar('Rechaza total negativo',
-    $q$UPDATE pedidos SET total = -1 WHERE id = 9001$q$, '23514');
 CALL pg_temp.debe_fallar('Rechaza el mismo producto dos veces en un pedido',
     $q$INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
        VALUES (9001, 9001, 1, 10000, 10000)$q$, '23505');
@@ -205,6 +203,71 @@ CALL pg_temp.debe_funcionar('HU-09: permite bajar la capacidad si las reservas c
 CALL pg_temp.debe_funcionar('HU-09: limpiar reservas de prueba',
     $q$DELETE FROM reservas WHERE id IN (9003, 9004, 9005);
        DELETE FROM mesas WHERE id = 9010$q$);
+
+-- HU-10: productos, pedidos y detalles.
+-- El pedido 9001 está ABIERTO en la mesa 9001 y tiene una línea:
+-- 2 unidades del producto 9001 a 10000 (subtotal 20000).
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: el total del pedido es la suma de sus líneas',
+       total = 20000 FROM pedidos WHERE id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: un total puesto a mano se vuelve a calcular',
+    $q$UPDATE pedidos SET total = -1 WHERE id = 9001$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: el total sigue siendo la suma de las líneas',
+       total = 20000 FROM pedidos WHERE id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: crear un segundo producto de prueba',
+    $q$INSERT INTO productos (id, nombre, precio) VALUES (9002, 'Producto Prueba 9002', 5000)$q$);
+CALL pg_temp.debe_fallar('HU-10: rechaza un subtotal que no es cantidad por precio',
+    $q$INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+       VALUES (9001, 9002, 3, 5000, 10000)$q$, '23514');
+CALL pg_temp.debe_funcionar('HU-10: agregar una línea correcta',
+    $q$INSERT INTO detalle_pedido (id, pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+       VALUES (9002, 9001, 9002, 3, 5000, 15000)$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: al agregar una línea, el total se actualiza (35000)',
+       total = 35000 FROM pedidos WHERE id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: cambiar la cantidad de una línea',
+    $q$UPDATE detalle_pedido SET cantidad = 1, subtotal = 10000 WHERE id = 9001$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: al cambiar la cantidad, el total se actualiza (25000)',
+       total = 25000 FROM pedidos WHERE id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: quitar una línea',
+    $q$DELETE FROM detalle_pedido WHERE id = 9002$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: al quitar una línea, el total se actualiza (10000)',
+       total = 10000 FROM pedidos WHERE id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: subir el precio del producto 9001',
+    $q$UPDATE productos SET precio = 12000 WHERE id = 9001$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: la línea conserva el precio del momento del pedido',
+       precio_unitario = 10000 AND subtotal = 10000
+FROM detalle_pedido WHERE id = 9001;
+CALL pg_temp.debe_fallar('HU-10: rechaza un segundo pedido activo en la misma mesa',
+    $q$INSERT INTO pedidos (mesa_id) VALUES (9001)$q$, '23505');
+CALL pg_temp.debe_funcionar('HU-10: permite un pedido pagado en la misma mesa',
+    $q$INSERT INTO pedidos (id, mesa_id, estado, closed_at) VALUES (9002, 9001, 'PAGADO', now())$q$);
+CALL pg_temp.debe_fallar('HU-10: rechaza un pedido pagado sin fecha de cierre',
+    $q$INSERT INTO pedidos (mesa_id, estado) VALUES (9001, 'PAGADO')$q$, '23514');
+CALL pg_temp.debe_fallar('HU-10: rechaza un pedido abierto con fecha de cierre',
+    $q$UPDATE pedidos SET closed_at = now() WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_fallar('HU-10: rechaza agregar productos a un pedido pagado',
+    $q$INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+       VALUES (9002, 9002, 1, 5000, 5000)$q$, '23514');
+CALL pg_temp.debe_funcionar('HU-10: pasar el pedido 9001 a cocina',
+    $q$UPDATE pedidos SET estado = 'EN_PREPARACION' WHERE id = 9001$q$);
+CALL pg_temp.debe_fallar('HU-10: rechaza cambiar una línea de un pedido en cocina',
+    $q$UPDATE detalle_pedido SET cantidad = 5, subtotal = 50000 WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_fallar('HU-10: rechaza quitar una línea de un pedido en cocina',
+    $q$DELETE FROM detalle_pedido WHERE id = 9001$q$, '23514');
+CALL pg_temp.debe_funcionar('HU-10: devolver el pedido 9001 a ABIERTO',
+    $q$UPDATE pedidos SET estado = 'ABIERTO' WHERE id = 9001$q$);
+INSERT INTO _resultado (prueba, ok)
+SELECT 'HU-10: la vista muestra el pedido con sus líneas y productos',
+       count(*) = 1 AND bool_and(producto_nombre = 'Producto Prueba 9001' AND mesa_numero = 9001)
+FROM v_pedidos_detalle WHERE pedido_id = 9001;
+CALL pg_temp.debe_funcionar('HU-10: limpiar datos de prueba',
+    $q$DELETE FROM pedidos WHERE id = 9002;
+       DELETE FROM productos WHERE id = 9002$q$);
 
 -- Reglas al eliminar (RESTRICT y CASCADE).
 CALL pg_temp.debe_fallar('RESTRICT: no borra producto ya vendido',
