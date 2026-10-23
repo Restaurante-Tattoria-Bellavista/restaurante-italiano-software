@@ -79,21 +79,24 @@ export const api = {
   },
 
   getClientes() {
-    return request('/api/clientes')
+    return request('/api/v1/clientes')
   },
 
   createCliente(datos) {
-    return request('/api/clientes', {
+    return request('/api/v1/clientes', {
       method: 'POST',
       body: JSON.stringify(datos),
     })
   },
 
   updateCliente(clienteId, datos) {
-    return request(`/api/clientes/${clienteId}`, {
-      method: 'PUT',
-      body: JSON.stringify(datos),
-    })
+    return request(
+      `/api/v1/clientes/${clienteId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(datos),
+      },
+    )
   },
 
   getProductos() {
@@ -115,7 +118,8 @@ export const api = {
         body: JSON.stringify(datos),
       },
     )
-   },
+  },
+
   getMesas() {
     return request('/api/v1/mesas')
   },
@@ -128,12 +132,16 @@ export const api = {
   },
 
   updateMesa(mesaId, datos) {
-    return request(`/api/v1/mesas/${mesaId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(datos),
-    })
+    return request(
+      `/api/v1/mesas/${mesaId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(datos),
+      },
+    )
   },
-    getMesaLayout(mesaId) {
+
+  getMesaLayout(mesaId) {
     return request(
       `/api/v1/mesas/${mesaId}/layout`,
     )
@@ -148,4 +156,27 @@ export const api = {
       },
     )
   },
-   }
+
+  getReportDashboard() {
+    return request(
+      '/api/v1/reportes/dashboard',
+    )
+  },
+
+  getReportProductos() {
+    return request(
+      '/api/v1/reportes/productos',
+    )
+  },
+
+  getConfiguracionRestaurante() {
+    return request('/api/v1/configuracion')
+  },
+
+  updateConfiguracionRestaurante(datos) {
+    return request('/api/v1/configuracion', {
+      method: 'PATCH',
+      body: JSON.stringify(datos),
+    })
+  },
+}
