@@ -5,54 +5,70 @@ En esta carpeta está todo lo de la base de datos PostgreSQL del proyecto:
 - `modelo-er.jpeg`: el diagrama entidad-relación.
 - `diccionario-datos.md`: la explicación de cada tabla y columna, las relaciones, los estados y qué pasa al eliminar registros.
 - `schema.sql`: el script que crea las tablas.
+- `seed.sql`: los datos iniciales (configuración, mesas, plano y menú).
 - `verify_schema.sql`: un script para revisar que el esquema quedó bien creado.
 
 ## Sobre el esquema
 
-El backend ya crea las tablas solo cuando arranca (`init_db.py` usa `Base.metadata.create_all()` con los modelos de `backend/app/models/`). Aun así, hicimos `schema.sql` para tener el esquema en SQL: así se puede leer sin abrir el código Python, crear las tablas en cualquier PostgreSQL sin levantar el backend, y cumplir con el script de creación que pide la guía.
+El backend no crea las tablas por su cuenta, así que la base se arma con estos scripts: primero `schema.sql` y después `seed.sql`. Los modelos del backend (`backend/app/models/`) usan las mismas tablas y columnas que define `schema.sql`.
 
-En el despliegue, PostgreSQL corre en un contenedor de Docker dentro de la máquina virtual de Azure, junto con el backend y el frontend. Los datos se guardan en el volumen `restaurante_postgres`, así que no se pierden cuando se reinician los contenedores.
+`schema.sql` se basó en los modelos del proyecto anterior (`restaurante_software`) y produce exactamente el mismo esquema que generaba ese backend. Usa `IF NOT EXISTS`, entonces se puede correr varias veces sin que falle.
 
-El script crea las mismas 8 tablas que el backend, con los mismos tipos, restricciones e índices. Usa `IF NOT EXISTS`, entonces no importa el orden: si las tablas ya existen, no las vuelve a crear.
+Si alguien cambia una tabla, toca actualizar también `schema.sql`, el diccionario de datos y los modelos del backend.
 
-Si alguien cambia un modelo del backend, toca actualizar también `schema.sql` y el diccionario de datos.
+En el despliegue, PostgreSQL corre en un contenedor de Docker dentro de la máquina virtual de Azure. Los datos se guardan en un volumen, así que no se pierden cuando se reinician los contenedores.
+
+## Datos iniciales
+
+`seed.sql` carga lo mínimo para que el sistema funcione en una instalación nueva:
+
+- La configuración de Trattoria Bellavista (una sola fila).
+- 12 mesas, todas libres.
+- La posición de las 12 mesas en el plano.
+- 10 productos del menú (entradas, platos fuertes, bebidas y postres).
+
+Clientes, reservas, pedidos y detalles de pedido empiezan vacíos, porque son datos de la operación diaria.
+
+Se puede correr varias veces sin duplicar nada: cada dato se identifica por algo que no se repite (el número de la mesa, el nombre del producto, el id 1 de la configuración) y, si ya existe, no se vuelve a insertar.
 
 ## Conexión
 
-La contraseña de la base no está en el repositorio. La conexión se configura con estas variables de entorno:
-
-```
-DB_HOST
-DB_PORT
-DB_NAME
-DB_USER
-DB_PASSWORD
-```
-
-Cada uno copia `.env.example` como `.env` y pone su propia contraseña. El archivo `.env` está en el `.gitignore`, así que no se sube. Docker Compose lee ese archivo y le pasa las variables a PostgreSQL y al backend, que las carga en `backend/app/config/settings.py`. `DB_PASSWORD` no tiene valor por defecto, entonces si falta, el backend no arranca.
-
-Pendiente: en el `.env.example` de la raíz quedó una contraseña de ejemplo (`bellavista_local_2026`). Hay que cambiarla por algo como `CAMBIAR_PASSWORD`, igual que en `backend/.env.example`.
+La contraseña de la base no está en el repositorio. Cada uno copia el archivo de ejemplo (`backend/.env.example`) como `.env` y pone sus propios datos. El archivo `.env` no se sube a GitHub.
 
 ## Crear la base
 
-### Con Docker
+### Con Docker (automático)
 
-```powershell
-Copy-Item .env.example .env   # luego cambiar DB_PASSWORD en el .env
-docker compose up -d --build
+La imagen oficial de PostgreSQL ejecuta sola los scripts que encuentre en `/docker-entrypoint-initdb.d/`, en orden alfabético, la primera vez que arranca con un volumen vacío. Para que la base quede creada y con datos sin hacer nada a mano, el servicio de la base en `docker-compose.yml` debe montar los dos scripts así:
+
+```yaml
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - restaurante_postgres:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
 ```
 
-Con esto el backend crea las tablas y carga los datos iniciales. Si además se quiere correr `schema.sql`:
+Con eso basta con:
 
 ```powershell
-Get-Content database/schema.sql | docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
+docker compose up -d
 ```
 
-Así funciona tanto en el computador como en la máquina virtual de Azure.
+Hay que tener en cuenta que PostgreSQL solo ejecuta esos scripts cuando el volumen está vacío. Si la base ya existía, no los vuelve a correr. Para cargarlos sobre una base que ya existe:
+
+```powershell
+Get-Content database/schema.sql, database/seed.sql | docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
+```
 
 ### Con psql (sin Docker)
 
-Sirve para crear las tablas en un PostgreSQL instalado aparte, sin usar Docker. Se necesita una base vacía y tener `psql` instalado. En PowerShell:
+Sirve para crear las tablas en un PostgreSQL instalado aparte. Se necesita una base vacía y tener `psql` instalado. En PowerShell:
 
 ```powershell
 $env:PGHOST="<servidor>"
@@ -61,12 +77,24 @@ $env:PGDATABASE="restaurante_db"
 $env:PGUSER="restaurante_app"
 $env:PGPASSWORD="<contraseña>"
 
-psql -v ON_ERROR_STOP=1 -f database/schema.sql
+psql -v ON_ERROR_STOP=1 -f database/schema.sql -f database/seed.sql
 ```
 
 Si no sale ningún `ERROR`, quedó bien. Si las tablas ya existían, salen avisos de `already exists, skipping`, pero eso no es un problema.
 
-## Verificar
+Para revisar que los datos quedaron cargados:
+
+```sql
+SELECT
+  (SELECT count(*) FROM restaurante_config) AS configuracion,
+  (SELECT count(*) FROM mesas)              AS mesas,
+  (SELECT count(*) FROM mesa_layout)        AS plano,
+  (SELECT count(*) FROM productos)          AS productos;
+```
+
+Debe dar 1, 12, 12 y 10.
+
+## Verificar el esquema
 
 ```powershell
 psql -f database/verify_schema.sql
@@ -86,7 +114,7 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < d
 
 El script muestra las tablas, las claves foráneas y los índices únicos, y después hace 37 pruebas. Por ejemplo, intenta guardar un producto con precio 0 o una mesa con un número repetido, y revisa que PostgreSQL lo rechace. También prueba que no se pueda borrar un producto que ya se vendió y que, al borrar un pedido, se borren sus detalles.
 
-Las pruebas corren dentro de una transacción que se deshace al final, así que no dejan datos guardados. Si todo está bien, la última línea dice:
+Las pruebas corren dentro de una transacción que se deshace al final, así que no dejan datos guardados ni tocan los datos iniciales. Si todo está bien, la última línea dice:
 
 ```
 VERIFICACION COMPLETA: 37/37 pruebas superadas
@@ -97,11 +125,9 @@ VERIFICACION COMPLETA: 37/37 pruebas superadas
 Probamos todo en PostgreSQL 16:
 
 - `schema.sql` en una base vacía: se crearon las 8 tablas sin errores. Al correrlo una segunda vez tampoco falló.
-- `verify_schema.sql`: pasaron las 37 pruebas.
-- Comparamos `schema.sql` con lo que genera el backend. Sacamos el SQL de los modelos con SQLAlchemy 2.0.52 (la versión del proyecto), creamos una base con cada uno y comparamos las dos con `pg_dump --schema-only`. Salieron iguales. Si alguien quiere repetir la comparación:
+- `verify_schema.sql`: pasaron las 37 pruebas, tanto en una base vacía como en una con los datos iniciales.
+- `schema.sql` + `seed.sql` en una base vacía: quedaron 1 configuración, 12 mesas, 12 posiciones y 10 productos, y las tablas de operación vacías.
+- `seed.sql` corrido dos y tres veces seguidas: los conteos no cambiaron, no se duplicó nada.
+- Comparamos `schema.sql` con lo que generaba el backend del proyecto anterior. Sacamos el SQL de sus modelos con SQLAlchemy 2.0.52, creamos una base con cada uno y comparamos las dos con `pg_dump --schema-only`. Salieron iguales.
 
-```bash
-pg_dump --schema-only --no-owner base_backend > backend.sql
-pg_dump --schema-only --no-owner base_script  > script.sql
-diff backend.sql script.sql
-```
+Falta probar la carga automática dentro de Docker cuando el `docker-compose.yml` del proyecto esté listo.
