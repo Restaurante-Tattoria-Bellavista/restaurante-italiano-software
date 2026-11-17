@@ -23,6 +23,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://restaurant:${POSTGRES_PASSWORD:?Configurar POSTGRES_PASSWORD en .env}@db:5432/restaurant
       ENVIRONMENT: production
+      AUTH_SECRET: ${AUTH_SECRET:?Configurar AUTH_SECRET en .env}
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
@@ -37,15 +39,31 @@ services:
   frontend:
     build: ./frontend-react
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       backend:
         condition: service_healthy
     networks: [internal]
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal]
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   internal:
