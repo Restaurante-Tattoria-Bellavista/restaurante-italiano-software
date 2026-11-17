@@ -61,9 +61,7 @@ jobs:
               ;;
 
             main)
-              if [[ "$HEAD_REF" == "prod" ]] ||
-                 [[ "$HEAD_REF" == "release/integracion-main-20261023" &&
-                    "$PR_NUMBER" == "57" ]]; then
+              if [[ "$HEAD_REF" == "prod" ]]; then
                 flujo_valido=true
               fi
               ;;
