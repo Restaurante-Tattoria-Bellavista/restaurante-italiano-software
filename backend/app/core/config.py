@@ -1,12 +1,24 @@
+import secrets
 from functools import lru_cache
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "Trattoria Bellavista API"
     environment: str = "development"
-    database_url: str = "postgresql+psycopg://restaurant:restaurant@localhost:5432/restaurant"
+    # Sin valor por defecto: la URL con la contraseña debe venir de DATABASE_URL (ver .env.example).
+    database_url: str = ""
     database_connect_timeout: int = 3
+
+    # Clave para firmar los tokens de sesion. Definir AUTH_SECRET en produccion:
+    # si no se define, se genera una nueva en cada arranque y las sesiones se cierran al reiniciar.
+    auth_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(48))
+    auth_token_ttl_seconds: int = 8 * 60 * 60
+
+    # Token que usan los gateways BLE (ESP32) para enviar lecturas. No es una sesión de usuario.
+    gateway_token: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

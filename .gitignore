@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Artefactos de compilacion del firmware (PlatformIO)
+.pio/

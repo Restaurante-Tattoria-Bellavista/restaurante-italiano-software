@@ -7,6 +7,8 @@ from app.core.config import get_settings
 @lru_cache
 def get_engine():
     settings = get_settings()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL no está configurada.")
     return create_engine(
         settings.database_url,
         pool_pre_ping=True,

@@ -721,4 +721,96 @@ SELECT
 FROM conteo
 ORDER BY orden;
 
+-- ---------------------------------------------------------------------
+-- Autenticacion: usuarios del sistema e ingreso facial (feature/login-facial)
+-- Roles: ADMIN (acceso total y gestion de usuarios) y PERSONAL (operacion).
+-- rostro_descriptor: vector de 128 valores generado en el navegador (face-api.js).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS usuarios (
+    id                SERIAL        NOT NULL,
+    username          VARCHAR(60)   NOT NULL,
+    nombre            VARCHAR(120)  NOT NULL,
+    rol               VARCHAR(20)   NOT NULL,
+    password_hash     VARCHAR(255),
+    rostro_descriptor DOUBLE PRECISION[],
+    activo            BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT pk_usuarios PRIMARY KEY (id),
+    CONSTRAINT uq_usuarios_username UNIQUE (username),
+    CONSTRAINT ck_usuarios_rol CHECK (rol IN ('ADMIN', 'PERSONAL'))
+);
+
+-- ---------------------------------------------------------------------
+-- Seguridad de acceso: bloqueo tras intentos fallidos y auditoria de ingresos.
+-- Idempotente: sirve para bases nuevas y para bases ya creadas.
+-- ---------------------------------------------------------------------
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS intentos_fallidos INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS auditoria_accesos (
+    id               SERIAL       NOT NULL,
+    usuario_id       INTEGER,
+    username_intento VARCHAR(60),
+    metodo           VARCHAR(20)  NOT NULL,
+    exitoso          BOOLEAN      NOT NULL,
+    motivo           VARCHAR(60)  NOT NULL,
+    ip               VARCHAR(64),
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT pk_auditoria_accesos PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS ix_auditoria_accesos_created_at ON auditoria_accesos (created_at);
+
+-- ---------------------------------------------------------------------
+-- Reconocimiento facial con varias perspectivas (FRENTE, IZQUIERDA, DERECHA, ARRIBA, ABAJO).
+-- Cada persona puede tener varias plantillas. Idempotente.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS rostro_plantillas (
+    id          SERIAL            NOT NULL,
+    usuario_id  INTEGER           NOT NULL,
+    pose        VARCHAR(20)       NOT NULL,
+    descriptor  DOUBLE PRECISION[] NOT NULL,
+    created_at  TIMESTAMPTZ       NOT NULL DEFAULT now(),
+    CONSTRAINT pk_rostro_plantillas PRIMARY KEY (id),
+    CONSTRAINT fk_rostro_plantillas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
+    CONSTRAINT ck_rostro_pose CHECK (pose IN ('FRENTE', 'IZQUIERDA', 'DERECHA', 'ARRIBA', 'ABAJO'))
+);
+CREATE INDEX IF NOT EXISTS ix_rostro_plantillas_usuario_id ON rostro_plantillas (usuario_id);
+
+-- Migra el rostro de una sola toma (version anterior) y elimina la columna.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'usuarios' AND column_name = 'rostro_descriptor'
+    ) THEN
+        INSERT INTO rostro_plantillas (usuario_id, pose, descriptor)
+        SELECT id, 'FRENTE', rostro_descriptor
+        FROM usuarios
+        WHERE rostro_descriptor IS NOT NULL;
+        ALTER TABLE usuarios DROP COLUMN rostro_descriptor;
+    END IF;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- Ubicacion del personal con etiquetas BLE (gateways de zona).
+-- Solo guarda la zona actual de cada persona, sin historial. Idempotente.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS etiquetas_ubicacion (
+    etiqueta_id VARCHAR(40) NOT NULL,
+    usuario_id  INTEGER     NOT NULL,
+    CONSTRAINT pk_etiquetas_ubicacion PRIMARY KEY (etiqueta_id),
+    CONSTRAINT uq_etiquetas_ubicacion_usuario UNIQUE (usuario_id),
+    CONSTRAINT fk_etiquetas_ubicacion_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ubicaciones_actuales (
+    usuario_id    INTEGER      NOT NULL,
+    zona          VARCHAR(60)  NOT NULL,
+    rssi          INTEGER      NOT NULL,
+    actualizado_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT pk_ubicaciones_actuales PRIMARY KEY (usuario_id),
+    CONSTRAINT fk_ubicaciones_actuales_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+);
+
 COMMIT;
