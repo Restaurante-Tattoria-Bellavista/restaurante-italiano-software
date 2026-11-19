@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configurar POSTGRES_PASSWORD en .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U restaurant -d restaurant"]
       interval: 5s
