@@ -1,0 +1,105 @@
+# API de FastAPI con 2 réplicas.
+#
+# La imagen la publica el workflow .github/workflows/imagenes.yml en ghcr.io.
+# El Service se tiene que llamar "backend" porque así lo busca el Nginx del frontend.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: trattoria
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/restaurante-tattoria-bellavista/trattoria-backend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: ENVIRONMENT
+            - name: AUTH_TOKEN_TTL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: AUTH_TOKEN_TTL_SECONDS
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: POSTGRES_PASSWORD
+            # Kubernetes reemplaza $(VARIABLE) con las variables definidas arriba,
+            # así la contraseña solo está guardada en el Secret.
+            - name: DATABASE_URL
+              value: postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@db:5432/$(POSTGRES_DB)
+            # Misma llave en todas las réplicas: un token creado en un pod sirve en el otro.
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: AUTH_SECRET
+            - name: GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: GATEWAY_TOKEN
+                  optional: true
+          # readiness: el pod solo recibe tráfico cuando puede hablar con la base.
+          readinessProbe:
+            httpGet:
+              path: /health/db
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          # liveness: si la API deja de responder, Kubernetes reinicia el contenedor.
+          # Usa /health (sin base) para no reiniciar la API solo porque la base esté caída.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: trattoria
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
