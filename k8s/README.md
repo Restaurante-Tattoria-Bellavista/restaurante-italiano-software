@@ -18,38 +18,46 @@ Esta carpeta tiene todo lo necesario para correr la aplicación en un clúster d
 ## Cómo está armado
 
 ```mermaid
-flowchart LR
+flowchart TB
     U(["Navegador<br/>localhost:8081"])
 
     subgraph NS["Namespace trattoria"]
-        direction LR
         SF{{"Service frontend<br/>LoadBalancer :8081"}}
         F["Pod frontend<br/>React + Nginx"]
         SB{{"Service backend<br/>ClusterIP :8000"}}
         B1["Pod backend<br/>réplica 1"]
         B2["Pod backend<br/>réplica 2"]
+        CS["ConfigMap y Secret<br/>configuración y claves"]
         SD{{"Service db<br/>headless :5432"}}
-        D[("Pod db-0<br/>PostgreSQL 17")]
+        D[("db-0<br/>PostgreSQL 17")]
         V[("Volumen<br/>1 GiB")]
-        CM["ConfigMap<br/>trattoria-config"]
-        S["Secret<br/>trattoria-secret"]
     end
 
-    U --> SF --> F
+    U --> SF
+    SF --> F
     F -- "/api, /health, /docs" --> SB
     SB --> B1
     SB --> B2
     B1 --> SD
     B2 --> SD
-    SD --> D --- V
-    CM -.-> B1
-    CM -.-> B2
-    S -.-> B1
-    S -.-> B2
-    S -.-> D
+    SD --> D
+    D --- V
+    CS -.-> B1
+    CS -.-> B2
+
+    classDef entrada fill:#f6f1e7,stroke:#8a6d3b,color:#3d2f14
+    classDef servicio fill:#e3f1ec,stroke:#1d6b57,color:#0b3d31
+    classDef pod fill:#fdf3df,stroke:#b8862f,color:#4a3510
+    classDef datos fill:#f1e7e1,stroke:#7a5c45,color:#3b2a1d
+    classDef config fill:#eef0f2,stroke:#6b7280,color:#1f2937,stroke-dasharray:4 3
+    class U entrada
+    class SF,SB,SD servicio
+    class F,B1,B2 pod
+    class D,V datos
+    class CS config
 ```
 
-Las flechas punteadas son la configuración que reciben los pods: lo que no es secreto sale del ConfigMap y las claves salen del Secret.
+Los colores separan los tipos de pieza: en verde los Services (la dirección fija por la que se llega a cada parte), en dorado los pods que corren el código y en café la base con su volumen. La caja gris punteada es la configuración: lo que no es secreto sale del ConfigMap y las claves salen del Secret.
 
 Dos nombres no se pueden cambiar:
 
@@ -136,9 +144,21 @@ docker build -t ghcr.io/restaurante-tattoria-bellavista/trattoria-frontend:dev .
 ## Desplegar paso a paso
 
 ```mermaid
-flowchart LR
-    P1["1. Namespace"] --> P2["2. Secret"] --> P3["3. ConfigMap"] --> P4["4. Scripts<br/>de la base"]
-    P4 --> P5["5. PostgreSQL"] --> P6["6. Backend<br/>y frontend"] --> P7["7. Usuario<br/>admin"] --> P8["8. Abrir<br/>la app"]
+flowchart TB
+    subgraph A["Preparar"]
+        direction LR
+        P1["1. Namespace"] --> P2["2. Secret"] --> P3["3. ConfigMap"] --> P4["4. Scripts<br/>de la base"]
+    end
+    subgraph B["Desplegar y entrar"]
+        direction LR
+        P5["5. PostgreSQL"] --> P6["6. Backend<br/>y frontend"] --> P7["7. Usuario<br/>admin"] --> P8["8. Abrir<br/>la app"]
+    end
+    A --> B
+
+    classDef paso fill:#e3f1ec,stroke:#1d6b57,color:#0b3d31
+    classDef final fill:#fdf3df,stroke:#b8862f,color:#4a3510
+    class P1,P2,P3,P4,P5,P6,P7 paso
+    class P8 final
 ```
 
 > [!WARNING]
