@@ -1,0 +1,12 @@
+# Configuración que NO es secreta. Las claves van aparte, en el Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trattoria-config
+  namespace: trattoria
+data:
+  ENVIRONMENT: production
+  POSTGRES_DB: restaurant
+  POSTGRES_USER: restaurant
+  # Duración de la sesión en segundos (8 horas).
+  AUTH_TOKEN_TTL_SECONDS: "28800"

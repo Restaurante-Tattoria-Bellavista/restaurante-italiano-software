@@ -1,0 +1,6 @@
+# Todo lo de la aplicación vive en su propio namespace para no mezclarlo
+# con otras cosas del clúster (y para borrarlo de una sola vez si hace falta).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trattoria
