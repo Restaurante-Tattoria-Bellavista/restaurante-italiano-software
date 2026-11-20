@@ -6,6 +6,8 @@ from starlette.exceptions import HTTPException
 from fastapi.exceptions import RequestValidationError
 from app.core.config import get_settings
 from app.core.dependencies import get_current_user
+from app.core.metricas import medir_peticiones
+from app.core.metricas import router as metricas_router
 from app.core.errors import (
     BusinessError,
     business_exception_handler,
@@ -39,7 +41,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(BusinessError, business_exception_handler)
+    # Cuenta las peticiones y mide cuánto tarda cada una (ver app/core/metricas.py).
+    app.middleware("http")(medir_peticiones)
     app.include_router(health_router)
+    app.include_router(metricas_router)
     app.include_router(auth_router)
     app.include_router(tiempo_real_router)
     app.include_router(ubicaciones_router)
