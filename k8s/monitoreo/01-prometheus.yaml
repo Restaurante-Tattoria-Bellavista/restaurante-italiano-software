@@ -1,0 +1,121 @@
+# Prometheus dentro del clúster (HU-20).
+#
+# Lee /metrics de cada réplica del backend cada 15 segundos. Para encontrar las
+# réplicas usa un Service headless (backend-metricas): el DNS de Kubernetes devuelve
+# la IP de cada pod listo, así Prometheus las ve por separado y no necesita permisos
+# extra sobre la API del clúster.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-metricas
+  namespace: trattoria
+spec:
+  clusterIP: None
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: trattoria
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # Las réplicas de la API de Trattoria Bellavista.
+      - job_name: trattoria-backend
+        metrics_path: /metrics
+        dns_sd_configs:
+          - names:
+              - backend-metricas.trattoria.svc.cluster.local
+            type: A
+            port: 8000
+            refresh_interval: 15s
+
+      # El propio Prometheus, para revisar que está bien.
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: trattoria
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.53.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=7d
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: datos
+              mountPath: /prometheus
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        # Las series se guardan en un volumen temporal: si el pod se reinicia, empieza de cero.
+        # Para la demostración es suficiente; en producción iría un PersistentVolumeClaim.
+        - name: datos
+          emptyDir: {}
+---
+# En Docker Desktop queda disponible en http://localhost:9090
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: trattoria
+spec:
+  type: LoadBalancer
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
