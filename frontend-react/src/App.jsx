@@ -7,7 +7,18 @@ import MenuPage from './pages/MenuPage'
 import MesasPage from './pages/MesasPage'
 import ModulePage from './pages/ModulePage'
 import ReportesPage from './pages/ReportesPage'
-import { api } from './services/api'
+import PersonalPage from './pages/PersonalPage'
+import LoginPage from './pages/LoginPage'
+import UsuariosPage from './pages/UsuariosPage'
+import {
+  api,
+  EVENTO_SESION_EXPIRADA,
+} from './services/api'
+import {
+  borrarToken,
+  guardarToken,
+  obtenerToken,
+} from './services/session'
 
 const modulos = {
   mesas: {
@@ -66,6 +77,25 @@ const modulos = {
       'Administra la información general del restaurante.',
     icono: '⚙',
   },
+  personal: {
+    etiqueta: 'OPERACIÓN',
+    titulo: 'Personal en tiempo real',
+    descripcion:
+      'Zona actual de cada mesero según las etiquetas BLE.',
+    icono: '◎',
+  },
+  usuarios: {
+    etiqueta: 'SISTEMA',
+    titulo: 'Usuarios y acceso',
+    descripcion:
+      'Crea usuarios y registra su rostro para el ingreso facial.',
+    icono: '◉',
+  },
+}
+
+const ETIQUETA_ROL = {
+  ADMIN: 'Administrador',
+  PERSONAL: 'Personal',
 }
 
 function formatearFecha(fecha) {
@@ -100,6 +130,72 @@ function App() {
 
   const [fechaActual, setFechaActual] =
     useState(() => new Date())
+
+  const [usuario, setUsuario] = useState(null)
+
+  const [cargandoSesion, setCargandoSesion] =
+    useState(() => obtenerToken() !== null)
+
+  const esAdmin = usuario?.rol === 'ADMIN'
+
+  useEffect(() => {
+    if (!obtenerToken()) {
+      return undefined
+    }
+
+    let activo = true
+
+    api
+      .me()
+      .then((datos) => {
+        if (activo) {
+          setUsuario(datos)
+        }
+      })
+      .catch(() => {
+        borrarToken()
+      })
+      .finally(() => {
+        if (activo) {
+          setCargandoSesion(false)
+        }
+      })
+
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  useEffect(() => {
+    function alExpirarSesion() {
+      setUsuario(null)
+      setVistaActual('mesas')
+    }
+
+    window.addEventListener(
+      EVENTO_SESION_EXPIRADA,
+      alExpirarSesion,
+    )
+
+    return () => {
+      window.removeEventListener(
+        EVENTO_SESION_EXPIRADA,
+        alExpirarSesion,
+      )
+    }
+  }, [])
+
+  function iniciarSesion(sesion) {
+    guardarToken(sesion.token)
+    setUsuario(sesion.usuario)
+    setVistaActual('mesas')
+  }
+
+  function cerrarSesion() {
+    borrarToken()
+    setUsuario(null)
+    setMenuAbierto(false)
+  }
 
   async function verificarConexion() {
     try {
@@ -182,7 +278,27 @@ function App() {
       return <ConfiguracionPage />
     }
 
+    if (vistaActual === 'personal') {
+      return <PersonalPage esAdmin={esAdmin} />
+    }
+
+    if (vistaActual === 'usuarios' && esAdmin) {
+      return <UsuariosPage />
+    }
+
     return <ModulePage {...modulo} />
+  }
+
+  if (cargandoSesion) {
+    return (
+      <div className="login-shell">
+        <p role="status">Verificando sesión...</p>
+      </div>
+    )
+  }
+
+  if (!usuario) {
+    return <LoginPage onSesion={iniciarSesion} />
   }
 
   return (
@@ -193,6 +309,7 @@ function App() {
         abierto={menuAbierto}
         cerrar={() => setMenuAbierto(false)}
         conectado={conectado}
+        esAdmin={esAdmin}
       />
 
       <main className="main-content">
@@ -233,12 +350,14 @@ function App() {
 
             <div className="session-card">
               <div className="session-avatar">
-                G
+                {usuario.nombre.charAt(0).toUpperCase()}
               </div>
 
               <div>
-                <span>Sesión</span>
-                <strong>Gerente</strong>
+                <span>
+                  {ETIQUETA_ROL[usuario.rol] || 'Sesión'}
+                </span>
+                <strong>{usuario.nombre}</strong>
               </div>
             </div>
 
@@ -251,6 +370,14 @@ function App() {
               {verificando
                 ? 'Verificando...'
                 : '↻ Actualizar'}
+            </button>
+
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={cerrarSesion}
+            >
+              Cerrar sesión
             </button>
           </div>
         </header>
