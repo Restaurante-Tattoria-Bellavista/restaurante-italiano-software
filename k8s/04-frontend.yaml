@@ -1,0 +1,58 @@
+# Frontend de React servido por Nginx. Nginx también reenvía /api, /health y /docs al Service "backend".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: trattoria
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/restaurante-tattoria-bellavista/trattoria-frontend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+# En Docker Desktop un Service tipo LoadBalancer queda disponible en localhost.
+# La app se abre en http://localhost:8081 (localhost también deja usar la cámara).
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: trattoria
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http

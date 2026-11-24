@@ -1,0 +1,106 @@
+# Base de datos PostgreSQL dentro del clúster.
+#
+# Antes de aplicar este archivo hay que crear el ConfigMap con los scripts de
+# la base, a partir de database/ (así no hay una segunda copia del esquema):
+#   kubectl create configmap postgres-init -n trattoria \
+#     --from-file=01-schema.sql=database/schema.sql \
+#     --from-file=02-seed.sql=database/seed.sql
+#
+# Los scripts solo se ejecutan la primera vez, cuando el volumen está vacío.
+
+# Service "headless" (sin IP propia): le da al pod de la base el nombre fijo "db",
+# que es el que usa el backend en DATABASE_URL.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: trattoria
+spec:
+  clusterIP: None
+  selector:
+    app: db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+# StatefulSet en vez de Deployment: el pod conserva su nombre y su volumen
+# aunque se reinicie, que es lo que necesita una base de datos.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: trattoria
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: trattoria-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: POSTGRES_PASSWORD
+            # Subcarpeta dentro del volumen, por si el disco trae archivos propios (lost+found).
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/postgresql/data
+            - name: scripts-iniciales
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: scripts-iniciales
+          configMap:
+            name: postgres-init
+  # Kubernetes crea un volumen persistente de 1 GiB para el pod.
+  # Si se borra el pod, los datos quedan en el volumen.
+  volumeClaimTemplates:
+    - metadata:
+        name: datos
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
