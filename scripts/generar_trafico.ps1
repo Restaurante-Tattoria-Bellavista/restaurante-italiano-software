@@ -3,8 +3,12 @@ Genera tráfico de prueba contra la API para ver moverse las gráficas de Grafan
 
 Inicia sesión con un usuario de la app, recorre varias rutas de la API muchas veces,
 hace algunas peticiones sin sesión (para que aparezcan respuestas 401) y unos pocos
-intentos de ingreso facial con descriptores al azar (salen como "no reconocido" en
-el panel de la IA). Al final muestra un resumen por código de respuesta.
+intentos de ingreso facial con descriptores al azar, repartidos a lo largo de la prueba
+(salen como "no reconocido" en el panel de la IA). Al final muestra un resumen por
+código de respuesta.
+
+Como referencia, en un portátil cada ronda tarda unos 0,04 s: 1500 rondas son más o
+menos un minuto y 7500 rondas unos cinco minutos.
 
 Uso, desde la raíz del repositorio:
     powershell -ExecutionPolicy Bypass -File scripts\generar_trafico.ps1
@@ -16,7 +20,8 @@ param(
     [string]$Url = "http://localhost:8081",
     [string]$Usuario = "admin",
     [int]$Rondas = 200,
-    # La API bloquea una IP por 10 minutos después de 10 intentos faciales fallidos.
+    # Cada réplica de la API acepta 10 intentos faciales fallidos cada 10 minutos;
+    # los que pasen de ahí responden 429 (demasiados intentos) y no llegan a comparar.
     [int]$IntentosFaciales = 5
 )
 
@@ -65,20 +70,36 @@ function Pedir([string]$Metodo, [string]$Ruta, $Encabezados = $null, [string]$Cu
     $script:conteo[$codigo] = 1 + [int]$script:conteo[$codigo]
 }
 
-Write-Host "Enviando tráfico a $Url ($Rondas rondas de $($rutas.Count) peticiones)..." -ForegroundColor Cyan
+function IntentoFacial {
+    # Un descriptor de 128 números al azar: no se parece a ningún rostro registrado.
+    $descriptor = 1..128 | ForEach-Object { [math]::Round((Get-Random -Minimum -1000 -Maximum 1000) / 10000, 4) }
+    Pedir "POST" "/api/auth/face-login" $null (@{ descriptor = $descriptor } | ConvertTo-Json -Compress)
+}
+
+Write-Host "Enviando tráfico a $Url ($Rondas rondas de $($rutas.Count) peticiones, $IntentosFaciales intentos faciales)..." -ForegroundColor Cyan
 $reloj = [Diagnostics.Stopwatch]::StartNew()
+
+# Los intentos faciales se reparten a lo largo de la prueba para que se vean en las gráficas.
+$cadaFacial = if ($IntentosFaciales -gt 0) { [math]::Max(1, [math]::Floor($Rondas / $IntentosFaciales)) } else { 0 }
+$facialesHechos = 0
 
 for ($i = 1; $i -le $Rondas; $i++) {
     foreach ($ruta in $rutas) { Pedir "GET" $ruta $conSesion }
     if ($i % 10 -eq 0) {
         Pedir "GET" "/api/v1/mesas"   # sin sesión: la API responde 401
-        Write-Host ("  ronda {0} de {1}" -f $i, $Rondas)
+    }
+    if ($cadaFacial -gt 0 -and $i % $cadaFacial -eq 0 -and $facialesHechos -lt $IntentosFaciales) {
+        IntentoFacial
+        $facialesHechos++
+    }
+    if ($i % 100 -eq 0) {
+        Write-Host ("  ronda {0} de {1}  ({2:N0} s)" -f $i, $Rondas, $reloj.Elapsed.TotalSeconds)
     }
 }
 
-for ($j = 1; $j -le $IntentosFaciales; $j++) {
-    $descriptor = 1..128 | ForEach-Object { [math]::Round((Get-Random -Minimum -1000 -Maximum 1000) / 10000, 4) }
-    Pedir "POST" "/api/auth/face-login" $null (@{ descriptor = $descriptor } | ConvertTo-Json -Compress)
+while ($facialesHechos -lt $IntentosFaciales) {
+    IntentoFacial
+    $facialesHechos++
 }
 
 $reloj.Stop()

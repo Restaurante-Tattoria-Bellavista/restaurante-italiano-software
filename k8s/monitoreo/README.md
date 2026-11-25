@@ -2,6 +2,8 @@
 
 Prometheus y Grafana corren dentro del mismo clúster que la aplicación, en el namespace `trattoria`. Prometheus lee las métricas de cada réplica del backend cada 15 segundos y Grafana las muestra en un dashboard que se carga solo al arrancar.
 
+![Dashboard de Grafana durante una prueba de tráfico de 5 minutos](img/01-grafana-trafico.png)
+
 ```mermaid
 flowchart LR
     T(["scripts/generar_trafico.ps1"]) --> F["Frontend<br/>localhost:8081"]
@@ -86,7 +88,24 @@ kubectl get pods,svc -n trattoria
 powershell -ExecutionPolicy Bypass -File scripts\generar_trafico.ps1
 ```
 
-El script pide la contraseña del usuario `admin` de la app, recorre varias rutas de la API 200 veces, hace algunas peticiones sin sesión (para que salgan respuestas 401) y 5 intentos de ingreso facial con descriptores al azar. Con `-Rondas 500` genera más tráfico. `-ExecutionPolicy Bypass` solo aplica a esa ejecución; no cambia la configuración de Windows.
+El script pide la contraseña del usuario `admin` de la app, recorre 8 rutas de la API, hace algunas peticiones sin sesión (para que salgan respuestas 401) y reparte a lo largo de la prueba unos intentos de ingreso facial con descriptores al azar, que salen como no reconocidos. `-ExecutionPolicy Bypass` solo aplica a esa ejecución; no cambia la configuración de Windows.
+
+Para ver las gráficas con una franja de tráfico más larga:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\generar_trafico.ps1 -Rondas 7500 -IntentosFaciales 10
+```
+
+| Rondas | Duración aproximada | Peticiones |
+|---|---|---|
+| 200 (por defecto) | 10 segundos | unas 1.600 |
+| 1500 | 1 minuto | unas 12.000 |
+| 7500 | 5 minutos | unas 60.000 |
+
+En nuestras pruebas, en un portátil con Docker Desktop, la API atendió unas 200 peticiones por segundo con una latencia p95 cercana a 5 ms.
+
+> [!NOTE]
+> Cada réplica acepta 10 intentos faciales fallidos cada 10 minutos (es una protección del ingreso facial). Si se piden más, los que sobran responden 429 y no alcanzan a compararse, así que no salen en el panel de la IA.
 
 ## El dashboard
 
@@ -100,17 +119,27 @@ El script pide la contraseña del usuario `admin` de la app, recorre varias ruta
 | Mesas por estado | `max by (estado) (trattoria_mesas)` |
 | Ingreso con reconocimiento facial (IA) | intentos por resultado, tasa de reconocimiento, tiempo de la comparación y personas con rostro |
 
+La sección de la IA, después de la misma prueba (los intentos son descriptores al azar, por eso todos salen como no reconocidos):
+
+![Sección del ingreso facial en Grafana](img/02-grafana-ia.png)
+
 Los paneles de tráfico dejan por fuera `/health` y `/health/db`, porque esas rutas las llaman las probes de Kubernetes cada pocos segundos y taparían el tráfico real.
 
 **Cambiar el dashboard.** Lo más cómodo es editarlo en Grafana como admin, exportarlo (*Share* > *Export* > *Save to file*), reemplazar `dashboard-trattoria.json` y recargarlo:
 
 ```powershell
-kubectl create configmap grafana-dashboard-trattoria -n trattoria --from-file=dashboard-trattoria.json=k8s/monitoreo/dashboard-trattoria.json --dry-run=client -o yaml | kubectl apply -f -
+kubectl delete configmap grafana-dashboard-trattoria -n trattoria
+kubectl create configmap grafana-dashboard-trattoria -n trattoria --from-file=dashboard-trattoria.json=k8s/monitoreo/dashboard-trattoria.json
 kubectl rollout restart deployment/grafana -n trattoria
 ```
+
+> [!WARNING]
+> No usar la forma `kubectl create ... --dry-run=client -o yaml | kubectl apply -f -` en Windows PowerShell: al pasar el texto por el `|`, PowerShell cambia las letras con tilde por `?` y los títulos quedan como "R??plicas". Nos pasó.
 
 ## Limitaciones
 
 - Prometheus guarda las series en un volumen temporal (`emptyDir`): si su pod se reinicia, las gráficas empiezan de cero. Para la demostración alcanza; en producción iría un volumen persistente.
 - Los contadores viven en la memoria de cada réplica, así que se reinician cuando se reinicia el pod. Las consultas con `rate()` y `increase()` ya tienen en cuenta esos reinicios.
 - El panel de mesas consulta la base cada vez que Prometheus lee `/metrics` (cada 15 segundos por réplica). Es una consulta pequeña sobre una vista, pero si la base no responde, esa métrica simplemente no aparece en esa lectura.
+- El histograma del tiempo de la comparación facial empieza en 0,5 ms. Con pocos rostros registrados todas las comparaciones caen en ese primer tramo, y Grafana muestra 250 µs (p50) y 475 µs (p95) porque interpola dentro de él; el tiempo real es menor. Si el número de personas crece, conviene revisar esos tramos.
+- Los paneles muestran los últimos 30 minutos. Si no ha habido tráfico en ese rato, las gráficas salen vacías aunque Prometheus tenga los datos; basta con ampliar el rango de tiempo arriba a la derecha.

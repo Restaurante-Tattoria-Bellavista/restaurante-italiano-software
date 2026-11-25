@@ -8,7 +8,7 @@
   "description": "Tráfico, latencia y datos del restaurante leídos por Prometheus desde las réplicas del backend.",
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -465,7 +465,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Respuestas por código HTTP",
-      "description": "Peticiones por segundo según el código de respuesta. Los 401 son intentos sin sesión iniciada.",
+      "description": "Peticiones por segundo según el código de respuesta. Los 401 son peticiones sin sesión iniciada o ingresos faciales rechazados.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -502,12 +502,43 @@
             "showPoints": "never",
             "spanNulls": true,
             "stacking": {
-              "mode": "normal",
+              "mode": "none",
               "group": "A"
             }
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "200"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "401"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -846,7 +877,7 @@
       "id": 13,
       "type": "stat",
       "title": "Personas con rostro registrado",
-      "description": "Usuarios activos que tienen su rostro guardado (descriptores, no fotos).",
+      "description": "Usuarios que tienen su rostro guardado (descriptores, no fotos), estén activos o no.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -942,7 +973,7 @@
             "showPoints": "never",
             "spanNulls": true,
             "stacking": {
-              "mode": "normal",
+              "mode": "none",
               "group": "A"
             }
           }
