@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.dependencies import get_current_user, require_admin
+from app.core.metricas import registrar_ingreso_facial
 from app.core.rate_limit import limitador_face_login, limitador_login
 from app.core.security import HASH_FICTICIO, create_token, hash_password, verify_password
 from app.db.session import get_db
@@ -135,7 +137,9 @@ def face_login(payload: FaceLoginRequest, request: Request, db: Session = Depend
     for usuario_id, plantilla in filas:
         plantillas_por_usuario.setdefault(usuario_id, []).append(plantilla)
 
+    inicio = time.perf_counter()
     usuario_id = buscar_usuario(descriptor, plantillas_por_usuario)
+    registrar_ingreso_facial(time.perf_counter() - inicio, usuario_id is not None)
     if usuario_id is None:
         _auditar(db, usuario_id=None, username=None, metodo="ROSTRO",
                  exitoso=False, motivo="ROSTRO_NO_RECONOCIDO", ip=ip)
