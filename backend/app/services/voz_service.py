@@ -14,19 +14,21 @@ import json
 import logging
 import re
 import time
+from datetime import datetime, timezone
 import unicodedata
 import urllib.error
 import urllib.request
 
 from typing import NamedTuple
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import BusinessError
+from app.core.metricas import registrar_error_voz, registrar_interpretacion_voz, registrar_pedido_voz
 from app.models.catalogo import mesas, productos
-from app.models.operacion import detalle_pedido, pedidos
+from app.models.operacion import detalle_pedido, pedidos, voz_sesiones
 
 logger = logging.getLogger(__name__)
 
@@ -412,6 +414,25 @@ def interpretar(
     audio: bytes | None = None,
     mime: str = "audio/wav",
 ) -> dict:
+    """Entiende un dictado y mide la interpretacion para Prometheus (HU-21: metrica propia de la IA)."""
+    origen = "audio" if audio else "texto"
+    inicio = time.perf_counter()
+    try:
+        r = _interpretar(db, texto, borrador_in, audio, mime)
+    except Exception:
+        registrar_error_voz(origen)
+        raise
+    registrar_interpretacion_voz(time.perf_counter() - inicio, r["motor"], origen)
+    return r
+
+
+def _interpretar(
+    db: Session,
+    texto: str,
+    borrador_in: dict | None,
+    audio: bytes | None = None,
+    mime: str = "audio/wav",
+) -> dict:
     texto = (texto or "").strip()
     if not texto and not audio:
         raise _error("No escuché nada. ¿Puedes repetirlo?")
@@ -569,26 +590,51 @@ def confirmar_pedido(db: Session, borrador_in: dict) -> dict:
 # ------------------------------------------------- sesiones para terminales (ESP32)
 
 SESION_TTL_S = 600
-_sesiones: dict[str, tuple[dict, float]] = {}
 
 
-def _sesion_borrador(sesion: str) -> dict:
-    ahora = time.monotonic()
-    for clave in [k for k, (_, t) in _sesiones.items() if ahora - t > SESION_TTL_S]:
-        del _sesiones[clave]
-    return _sesiones.get(sesion, (borrador_vacio(), 0))[0]
+def _sesion_borrador(db: Session, sesion: str) -> dict:
+    """Borrador guardado de la terminal; vacio si no hay o ya vencio (10 min sin hablar)."""
+    fila = db.execute(
+        select(voz_sesiones.c.borrador, voz_sesiones.c.actualizado_at).where(voz_sesiones.c.sesion == sesion)
+    ).first()
+    if fila is None:
+        return borrador_vacio()
+    actualizado = fila.actualizado_at
+    if actualizado is not None:
+        if actualizado.tzinfo is None:  # SQLite (pruebas) devuelve fechas sin zona
+            actualizado = actualizado.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - actualizado).total_seconds() > SESION_TTL_S:
+            return borrador_vacio()
+    return _limpiar_borrador(fila.borrador)
+
+
+def _guardar_borrador(db: Session, sesion: str, borrador: dict) -> None:
+    ahora = datetime.now(timezone.utc)
+    existe = db.execute(select(voz_sesiones.c.sesion).where(voz_sesiones.c.sesion == sesion)).first()
+    if existe:
+        db.execute(update(voz_sesiones).where(voz_sesiones.c.sesion == sesion)
+                   .values(borrador=borrador, actualizado_at=ahora))
+    else:
+        db.execute(insert(voz_sesiones).values(sesion=sesion, borrador=borrador, actualizado_at=ahora))
+    db.commit()
+
+
+def _olvidar_borrador(db: Session, sesion: str) -> None:
+    db.execute(delete(voz_sesiones).where(voz_sesiones.c.sesion == sesion))
+    db.commit()
 
 
 def interpretar_audio_sesion(db: Session, sesion: str, audio: bytes, mime: str) -> dict:
-    """Terminal sin pantalla/estado (ESP32): el borrador vive en el servidor por `sesion`.
+    """Terminal sin pantalla/estado (ESP32): el borrador vive en la base por `sesion`.
     Si el pedido queda confirmado, se crea y la sesion se reinicia."""
-    r = interpretar(db, "", _sesion_borrador(sesion), audio=audio, mime=mime)
+    r = interpretar(db, "", _sesion_borrador(db, sesion), audio=audio, mime=mime)
     r["pedido"] = None
     if r["confirmar"]:
         r["pedido"] = confirmar_pedido(db, r["borrador"])
-        _sesiones.pop(sesion, None)
+        registrar_pedido_voz("terminal")
+        _olvidar_borrador(db, sesion)
     elif r["cancelar"]:
-        _sesiones.pop(sesion, None)
+        _olvidar_borrador(db, sesion)
     else:
-        _sesiones[sesion] = (r["borrador"], time.monotonic())
+        _guardar_borrador(db, sesion, r["borrador"])
     return r

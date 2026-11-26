@@ -31,6 +31,10 @@ Las métricas están en `backend/app/core/metricas.py` y se exponen en `GET /met
 | `trattoria_mesas` | Gauge | Mesas activas por estado, leídas de la vista `v_mesas_por_estado` |
 | `trattoria_ingreso_facial_total` | Counter | Intentos de ingreso facial: `reconocido` o `no_reconocido` (HU-21) |
 | `trattoria_ingreso_facial_comparacion_seconds` | Histogram | Tiempo de comparar el descriptor con los rostros registrados (HU-21) |
+| `trattoria_voz_interpretaciones_total` | Counter | Dictados entendidos, por motor (`gemini` o `reglas`) y origen (`audio` o `texto`) |
+| `trattoria_voz_interpretacion_seconds` | Histogram | Tiempo de entender un dictado, incluida la llamada a Gemini |
+| `trattoria_voz_errores_total` | Counter | Dictados que no se pudieron procesar |
+| `trattoria_voz_pedidos_total` | Counter | Pedidos enviados a cocina por voz (`terminal` o `web`) |
 | `trattoria_personas_con_rostro` | Gauge | Usuarios con el rostro registrado (HU-21) |
 
 La etiqueta `ruta` guarda la ruta como está declarada (`/api/v1/pedidos/{pedido_id}`) y no la URL real, para que cada pedido no cree una serie nueva en Prometheus. Las rutas que no existen se agrupan como `sin_ruta`.
@@ -118,6 +122,7 @@ En nuestras pruebas, en un portátil con Docker Desktop, la API atendió unas 20
 | Respuestas por código HTTP | `sum by (estado) (rate(trattoria_http_requests_total[1m]))` |
 | Mesas por estado | `max by (estado) (trattoria_mesas)` |
 | Ingreso con reconocimiento facial (IA) | intentos por resultado, tasa de reconocimiento, tiempo de la comparación y personas con rostro |
+| Pedidos por voz con Gemini (IA) | dictados entendidos, pedidos a cocina, % de respaldo local, errores, dictados por minuto y tiempo de interpretación (p50/p95) |
 
 La sección de la IA, después de la misma prueba (los intentos son descriptores al azar, por eso todos salen como no reconocidos):
 

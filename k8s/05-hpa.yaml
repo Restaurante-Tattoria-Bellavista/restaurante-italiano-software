@@ -1,0 +1,32 @@
+# Autoescalado horizontal de la API (opcional del Proyecto 3).
+# Sube réplicas cuando el uso de CPU promedio pasa del 60 % de lo que pide cada pod (100m) y las baja cuando
+# vuelve la calma. Necesita metrics-server en el clúster (Docker Desktop y kind no lo traen por defecto;
+# ver "Autoescalado" en k8s/README.md). Se demuestra con scripts/generar_trafico.ps1.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+  namespace: trattoria
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2   # nunca menos de las 2 réplicas que exige el enunciado
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # reacciona rápido para que se vea en la demostración
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120   # espera 2 min de calma antes de bajar réplicas

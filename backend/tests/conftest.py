@@ -10,9 +10,9 @@ from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.main import app
 from app.models.catalogo import metadata, mesas, productos
-from app.models.operacion import detalle_pedido, pedidos
+from app.models.operacion import detalle_pedido, pedidos, voz_sesiones
 
-TABLAS = [mesas, productos, pedidos, detalle_pedido]
+TABLAS = [mesas, productos, pedidos, detalle_pedido, voz_sesiones]
 
 # El id es la posicion (1..N): las pruebas los usan directamente.
 MENU = [

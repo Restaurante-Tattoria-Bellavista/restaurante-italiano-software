@@ -816,6 +816,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_solicitudes_pendiente_username
 CREATE INDEX IF NOT EXISTS ix_solicitudes_estado ON solicitudes_acceso (estado, created_at);
 
 -- ---------------------------------------------------------------------
+-- Borrador del pedido de cada terminal de voz (ESP32), por sesion. En la base y no en memoria para que
+-- funcione con varias replicas del backend. Idempotente.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS voz_sesiones (
+    sesion         VARCHAR(40) NOT NULL,
+    borrador       JSONB       NOT NULL,
+    actualizado_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT pk_voz_sesiones PRIMARY KEY (sesion)
+);
+
+-- ---------------------------------------------------------------------
 -- Ubicacion del personal con etiquetas BLE (gateways de zona).
 -- Solo guarda la zona actual de cada persona, sin historial. Idempotente.
 -- ---------------------------------------------------------------------

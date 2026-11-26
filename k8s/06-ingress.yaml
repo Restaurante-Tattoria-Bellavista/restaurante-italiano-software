@@ -1,0 +1,41 @@
+# Ingress (opcional del Proyecto 3): una sola entrada que enruta hacia el frontend y la API.
+# Necesita un controlador de Ingress instalado (ingress-nginx; ver "Ingress" en k8s/README.md).
+# Se abre en http://trattoria.localhost (los navegadores resuelven *.localhost a 127.0.0.1).
+# /metrics y /docs NO se publican por aquí: Prometheus lee /metrics por dentro del clúster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trattoria
+  namespace: trattoria
+  annotations:
+    # Tiempos largos: el WebSocket de /api/ws y los audios del ESP32 (Gemini puede tardar ~25 s).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"   # el audio de la terminal pesa menos de 600 KB
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: trattoria.localhost
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  name: http
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  name: http

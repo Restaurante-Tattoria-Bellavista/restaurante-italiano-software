@@ -52,6 +52,16 @@ README.md
 docs/images/incidencias/
 ```
 
+Otros documentos del Proyecto 3:
+
+| Tema | Documento |
+|---|---|
+| Kubernetes, monitoreo, autoescalado (HPA) e Ingress | [`k8s/README.md`](k8s/README.md), [`k8s/monitoreo/README.md`](k8s/monitoreo/README.md) |
+| Inteligencia artificial (pedido por voz con Gemini y reconocimiento facial) | [`docs/ia.md`](docs/ia.md) |
+| Autenticación, roles y secretos | [`docs/autenticacion.md`](docs/autenticacion.md) |
+| Terminal ESP32 (micrófono y localizador BLE): conexiones, puesta en marcha y pendientes | [`docs/HANDOFF_IOT.md`](docs/HANDOFF_IOT.md) |
+| Historias de usuario por registrar en el GitHub Project | [`docs/historias-de-usuario-proyecto3.md`](docs/historias-de-usuario-proyecto3.md) |
+
 ## 3. Funcionalidades y API
 
 Todas las rutas de negocio revisadas usan prefijo `/api/v1`. La referencia de contrato, parámetros y modelos se puede consultar en **`http://localhost:8080/docs`** cuando Docker está levantado.

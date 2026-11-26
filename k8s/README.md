@@ -12,6 +12,7 @@ Esta carpeta tiene todo lo necesario para correr la aplicación en un clúster d
 - [Imágenes](#imágenes)
 - [Desplegar paso a paso](#desplegar-paso-a-paso)
 - [Prueba: Kubernetes se recupera solo](#prueba-kubernetes-se-recupera-solo)
+- [Opcionales: autoescalado e Ingress](#opcionales-autoescalado-e-ingress)
 - [Comandos del día a día](#comandos-del-día-a-día)
 - [Decisiones y limitaciones](#decisiones-y-limitaciones)
 
@@ -74,6 +75,8 @@ Dos nombres no se pueden cambiar:
 | `02-postgres.yaml` | StatefulSet + Service `db` | PostgreSQL 17 con volumen persistente de 1 GiB |
 | `03-backend.yaml` | Deployment + Service `backend` | FastAPI con **2 réplicas**, probes y límites de recursos |
 | `04-frontend.yaml` | Deployment + Service `frontend` | React con Nginx, publicado en el puerto **8081** |
+| `05-hpa.yaml` | HorizontalPodAutoscaler `backend` | *Opcional.* De 2 a 6 réplicas según la CPU (60 %) |
+| `06-ingress.yaml` | Ingress `trattoria` | *Opcional.* `http://trattoria.localhost` hacia frontend y API |
 
 Recursos que pide cada parte:
 
@@ -287,6 +290,47 @@ kubectl get pods -n trattoria -l app=backend -w
 
 Al recargar la página varias veces, la sesión se mantiene.
 
+## Opcionales: autoescalado e Ingress
+
+Los dos suman en la evaluación y no cambian el despliegue básico: se aplican aparte.
+
+### Autoescalado (HPA)
+
+El HPA necesita **metrics-server** para leer el uso de CPU. Docker Desktop y kind no lo traen:
+
+```powershell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+# En clústeres locales con certificados propios hay que permitir TLS sin verificar hacia los nodos:
+kubectl patch deployment metrics-server -n kube-system --type=json -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+kubectl apply -f k8s/05-hpa.yaml
+kubectl get hpa -n trattoria      # TARGETS pasa de <unknown> a un porcentaje en ~1 minuto
+```
+
+Demostración: abre 3 o 4 terminales y corre el script de tráfico en cada una con muchas rondas, mientras miras las réplicas subir:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\generar_trafico.ps1 -Rondas 5000
+kubectl get hpa -n trattoria -w   # en otra ventana
+kubectl get pods -n trattoria -l app=backend
+```
+
+Al terminar el tráfico, las réplicas bajan a 2 tras ~2 minutos de calma.
+
+> [!NOTE]
+> Con más de 2 réplicas, los límites de intentos de inicio de sesión y los avisos de tiempo real siguen siendo por pod (ver "Decisiones y limitaciones"). El pedido por voz sí funciona con cualquier cantidad de réplicas.
+
+### Ingress
+
+Necesita un controlador. Con ingress-nginx:
+
+```powershell
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.2/deploy/static/provider/cloud/deploy.yaml
+kubectl wait -n ingress-nginx --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
+kubectl apply -f k8s/06-ingress.yaml
+```
+
+Se abre en **<http://trattoria.localhost>**. El Service `frontend` sigue disponible en `localhost:8081`. `/metrics` y `/docs` no pasan por el Ingress.
+
 ## Comandos del día a día
 
 | Para qué | Comando |
@@ -327,4 +371,6 @@ kubectl delete namespace trattoria
 
 **Tiempo real con varias réplicas.** El WebSocket de `/api/ws` guarda las conexiones en la memoria de cada pod, así que un cambio hecho en una réplica solo les llega a los navegadores conectados a esa misma réplica. Lo mismo pasa con el límite de intentos fallidos de inicio de sesión, que se cuenta por pod. Una mejora posible es pasar esos avisos por `LISTEN/NOTIFY` de PostgreSQL o por Redis.
 
-**Sin HTTPS dentro del clúster.** Para un dominio real habría que poner un Ingress con certificado. En la demostración entramos por `localhost`.
+**Sin HTTPS dentro del clúster.** El Ingress incluido sirve HTTP. Para un dominio real habría que agregarle un certificado (cert-manager). En la demostración entramos por `localhost`.
+
+**La terminal de voz y varias réplicas.** El borrador del pedido de cada terminal ESP32 se guarda en la tabla `voz_sesiones` de PostgreSQL, así que dos audios seguidos pueden caer en pods distintos sin perder la conversación. Lo que sigue en memoria de cada pod es el estado en línea de las terminales (latido cada 30 s, se corrige solo en segundos). En una base creada antes de esta tabla hay que aplicar `database/schema.sql` (es idempotente).

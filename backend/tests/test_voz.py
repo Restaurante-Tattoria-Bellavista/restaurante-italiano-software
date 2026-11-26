@@ -223,3 +223,65 @@ def test_un_audio_cuenta_como_actividad_de_la_terminal(api, monkeypatch):
     api.post("/api/v1/voz/audio?sesion=terminal-2", content=WAV_FALSO, headers=CLAVE)
     t = api.get("/api/v1/voz/terminales").json()[0]
     assert t["sesion"] == "terminal-2" and t["audios"] == 1 and t["segundos_desde_audio"] is not None
+
+
+# --------------------------------------------------------- metricas de la IA (Prometheus)
+
+def _valor(nombre, **etiquetas):
+    from prometheus_client import REGISTRY
+    return REGISTRY.get_sample_value(nombre, etiquetas) or 0
+
+
+def test_cada_dictado_se_cuenta_y_se_mide(api):
+    antes = _valor("trattoria_voz_interpretaciones_total", motor="reglas", origen="texto")
+    n_antes = _valor("trattoria_voz_interpretacion_seconds_count", motor="reglas")
+    _decir(api, "mesa 2 una pizza")
+    assert _valor("trattoria_voz_interpretaciones_total", motor="reglas", origen="texto") == antes + 1
+    assert _valor("trattoria_voz_interpretacion_seconds_count", motor="reglas") == n_antes + 1
+
+
+def test_un_dictado_fallido_cuenta_como_error(api):
+    antes = _valor("trattoria_voz_errores_total", origen="texto")
+    r = api.post("/api/v1/voz/interpretar", json={"texto": "x" * 601})
+    assert r.status_code in (422, 400)
+    # la validacion de Pydantic rechaza antes de llegar al servicio: no cuenta; un vacio de servicio si.
+    from app.services import voz_service
+    import pytest
+    with pytest.raises(Exception):
+        voz_service.interpretar(None, "   ", None)
+    assert _valor("trattoria_voz_errores_total", origen="texto") == antes + 1
+
+
+def test_los_pedidos_confirmados_se_cuentan_por_origen(api):
+    web = _valor("trattoria_voz_pedidos_total", origen="web")
+    b = _decir(api, "mesa 4 un tiramisu")["borrador"]
+    assert api.post("/api/v1/voz/confirmar", json=b).status_code == 201
+    assert _valor("trattoria_voz_pedidos_total", origen="web") == web + 1
+
+
+def test_las_metricas_de_voz_aparecen_en_metrics(api):
+    cuerpo = api.get("/metrics").text
+    for nombre in ("trattoria_voz_interpretaciones_total", "trattoria_voz_interpretacion_seconds",
+                   "trattoria_voz_errores_total", "trattoria_voz_pedidos_total"):
+        assert nombre in cuerpo
+
+
+def test_el_borrador_de_la_terminal_vive_en_la_base_y_vence(api, monkeypatch):
+    """Con varias replicas dos audios caen en pods distintos: el borrador no puede estar en memoria."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import update
+
+    from app.db.session import get_db
+    from app.main import app
+    from app.models.operacion import voz_sesiones
+
+    db = next(app.dependency_overrides[get_db]())
+    voz_service._guardar_borrador(db, "esp-x", {"mesa_numero": 6, "items": [], "pendiente": None})
+    assert voz_service._sesion_borrador(db, "esp-x")["mesa_numero"] == 6
+    vencida = datetime.now(timezone.utc) - timedelta(seconds=voz_service.SESION_TTL_S + 5)
+    db.execute(update(voz_sesiones).where(voz_sesiones.c.sesion == "esp-x").values(actualizado_at=vencida))
+    db.commit()
+    assert voz_service._sesion_borrador(db, "esp-x")["mesa_numero"] is None
+    voz_service._olvidar_borrador(db, "esp-x")
+    db.close()

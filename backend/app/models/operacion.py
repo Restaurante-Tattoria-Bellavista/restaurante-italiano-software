@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, String, Numeric, DateTime, ForeignKey, Text, MetaData, func
+from sqlalchemy import Table, Column, Integer, String, Numeric, DateTime, ForeignKey, JSON, Text, MetaData, func
 from app.models.catalogo import metadata
 
 pedidos = Table('pedidos', metadata,
@@ -23,3 +23,10 @@ restaurante_config = Table('restaurante_config', metadata,
     Column('moneda',String(10),nullable=False,server_default='COP'), Column('ciudad',String(120)),
     Column('telefono',String(40)), Column('direccion',String(200)), Column('horario',String(160)),
     Column('updated_at',DateTime(timezone=True),nullable=False,server_default=func.now()))
+
+# Borrador del pedido de cada terminal de voz (ESP32). Vive en la base y no en la memoria del pod para que
+# funcione con varias replicas: dos audios seguidos pueden caer en pods distintos.
+voz_sesiones = Table('voz_sesiones', metadata,
+    Column('sesion', String(40), primary_key=True),
+    Column('borrador', JSON, nullable=False),
+    Column('actualizado_at', DateTime(timezone=True), nullable=False, server_default=func.now()))

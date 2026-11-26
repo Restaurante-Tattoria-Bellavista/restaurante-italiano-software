@@ -58,6 +58,52 @@ def registrar_ingreso_facial(segundos: float, reconocido: bool) -> None:
     INGRESOS_FACIALES.labels("reconocido" if reconocido else "no_reconocido").inc()
 
 
+# --- Pedidos por voz con Gemini (IA) -------------------------------------------
+
+VOZ_INTERPRETACIONES = Counter(
+    "trattoria_voz_interpretaciones_total",
+    "Dictados interpretados, según quién los entendió (gemini o reglas de respaldo) y si venían como audio o texto.",
+    ["motor", "origen"],
+)
+VOZ_LATENCIA = Histogram(
+    "trattoria_voz_interpretacion_seconds",
+    "Tiempo que tarda en entender un dictado (incluye la llamada a Gemini).",
+    ["motor"],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 30),
+)
+VOZ_ERRORES = Counter(
+    "trattoria_voz_errores_total",
+    "Dictados que no se pudieron procesar (audio ilegible, Gemini caído sin respaldo posible).",
+    ["origen"],
+)
+VOZ_PEDIDOS = Counter(
+    "trattoria_voz_pedidos_total",
+    "Pedidos enviados a cocina por voz, según el dispositivo que los dictó.",
+    ["origen"],
+)
+# Se crean en cero para que las gráficas existan antes del primer dictado.
+for _motor in ("gemini", "reglas"):
+    for _origen in ("audio", "texto"):
+        VOZ_INTERPRETACIONES.labels(_motor, _origen)
+for _origen in ("audio", "texto"):
+    VOZ_ERRORES.labels(_origen)
+for _origen in ("terminal", "web"):
+    VOZ_PEDIDOS.labels(_origen)
+
+
+def registrar_interpretacion_voz(segundos: float, motor: str, origen: str) -> None:
+    VOZ_LATENCIA.labels(motor).observe(segundos)
+    VOZ_INTERPRETACIONES.labels(motor, origen).inc()
+
+
+def registrar_error_voz(origen: str) -> None:
+    VOZ_ERRORES.labels(origen).inc()
+
+
+def registrar_pedido_voz(origen: str) -> None:
+    VOZ_PEDIDOS.labels(origen).inc()
+
+
 # --- Datos del restaurante leídos de la base en cada consulta de Prometheus ---
 
 class DatosRestaurante(Collector):

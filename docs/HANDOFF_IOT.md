@@ -99,7 +99,7 @@ La distancia es **orientativa**: `d = 10^((RSSI_1m − rssi) / (10·n))` en `bac
 - **TLS sin validar:** el ESP32 usa `setInsecure()` (cifra pero no verifica el servidor). Aceptable en red local de demostración; con dominio público conviene `setCACert`.
 - **Estado de terminales en memoria del backend:** con 2 réplicas en Kubernetes cada réplica ve solo los latidos que recibió; con el latido cada 30 s todas lo ven en pocos segundos, pero un reinicio del pod borra el historial.
 - **Gemini:** la clave gratuita tiene límites; con 429 el servidor responde error claro y el audio no se interpreta. **Rota la clave que se mostró en una captura** y guárdala solo en `.env` / Secret de Kubernetes.
-- **Sesiones de voz** (borrador del pedido) también están en memoria: usa una sola réplica o afinidad de sesión si se despliega en el clúster.
+- **Sesiones de voz** (borrador del pedido): se guardan en la tabla `voz_sesiones`, funcionan con varias réplicas. Si la base ya existía, aplica `database/schema.sql` (es idempotente).
 
 ## 7. Mapa de archivos
 

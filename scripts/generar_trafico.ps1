@@ -22,7 +22,10 @@ param(
     [int]$Rondas = 200,
     # Cada réplica de la API acepta 10 intentos faciales fallidos cada 10 minutos;
     # los que pasen de ahí responden 429 (demasiados intentos) y no llegan a comparar.
-    [int]$IntentosFaciales = 5
+    [int]$IntentosFaciales = 5,
+    # Dictados de prueba al asistente de voz (texto, sin micrófono). No crean pedidos: solo mueven las gráficas
+    # de la IA de voz. Con GEMINI_API_KEY cada uno llama a Gemini; usa pocos para no gastar cuota.
+    [int]$Dictados = 6
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,12 +79,20 @@ function IntentoFacial {
     Pedir "POST" "/api/auth/face-login" $null (@{ descriptor = $descriptor } | ConvertTo-Json -Compress)
 }
 
-Write-Host "Enviando tráfico a $Url ($Rondas rondas de $($rutas.Count) peticiones, $IntentosFaciales intentos faciales)..." -ForegroundColor Cyan
+function DictadoDeVoz([int]$n) {
+    $frases = @("mesa 2 una pizza margherita", "mesa 5 dos limonadas", "mesa 7 un tiramisu y un espresso", "mesa 3 una lasagna")
+    $texto = $frases[$n % $frases.Count]
+    Pedir "POST" "/api/v1/voz/interpretar" $conSesion (@{ texto = $texto; borrador = $null } | ConvertTo-Json -Compress)
+}
+
+Write-Host "Enviando tráfico a $Url ($Rondas rondas de $($rutas.Count) peticiones, $IntentosFaciales intentos faciales, $Dictados dictados de voz)..." -ForegroundColor Cyan
 $reloj = [Diagnostics.Stopwatch]::StartNew()
 
 # Los intentos faciales se reparten a lo largo de la prueba para que se vean en las gráficas.
 $cadaFacial = if ($IntentosFaciales -gt 0) { [math]::Max(1, [math]::Floor($Rondas / $IntentosFaciales)) } else { 0 }
 $facialesHechos = 0
+$cadaDictado = if ($Dictados -gt 0) { [math]::Max(1, [math]::Floor($Rondas / $Dictados)) } else { 0 }
+$dictadosHechos = 0
 
 for ($i = 1; $i -le $Rondas; $i++) {
     foreach ($ruta in $rutas) { Pedir "GET" $ruta $conSesion }
@@ -92,6 +103,10 @@ for ($i = 1; $i -le $Rondas; $i++) {
         IntentoFacial
         $facialesHechos++
     }
+    if ($cadaDictado -gt 0 -and $i % $cadaDictado -eq 0 -and $dictadosHechos -lt $Dictados) {
+        DictadoDeVoz $dictadosHechos
+        $dictadosHechos++
+    }
     if ($i % 100 -eq 0) {
         Write-Host ("  ronda {0} de {1}  ({2:N0} s)" -f $i, $Rondas, $reloj.Elapsed.TotalSeconds)
     }
@@ -100,6 +115,11 @@ for ($i = 1; $i -le $Rondas; $i++) {
 while ($facialesHechos -lt $IntentosFaciales) {
     IntentoFacial
     $facialesHechos++
+}
+
+while ($dictadosHechos -lt $Dictados) {
+    DictadoDeVoz $dictadosHechos
+    $dictadosHechos++
 }
 
 $reloj.Stop()

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.metricas import registrar_pedido_voz
 from app.db.session import get_db
 from app.services import voz_service
 
@@ -90,7 +91,9 @@ def interpretar(data: InterpretarRequest, db: Session = Depends(get_db)):
 @router.post("/confirmar", status_code=status.HTTP_201_CREATED)
 def confirmar(data: Borrador, db: Session = Depends(get_db)):
     """Crea (o amplia) el pedido de la mesa; queda visible en Cocina."""
-    return voz_service.confirmar_pedido(db, data.model_dump())
+    creado = voz_service.confirmar_pedido(db, data.model_dump())
+    registrar_pedido_voz("web")
+    return creado
 
 
 def _verificar_dispositivo(clave: str | None) -> None:

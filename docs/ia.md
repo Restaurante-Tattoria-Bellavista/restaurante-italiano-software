@@ -1,12 +1,107 @@
-# Ingreso con reconocimiento facial
+# Inteligencia artificial en Trattoria Bellavista
 
-Este documento explica la parte de inteligencia artificial de Trattoria Bellavista: el ingreso del personal con la cámara. La funcionalidad la construyó Keiner (HU-23) y la medición en Prometheus y Grafana es parte de la HU-21.
+El proyecto tiene dos funcionalidades de IA que trabajan sobre los datos reales de la aplicación (menú, mesas, pedidos y usuarios):
+
+| | Funcionalidad | Tipo de IA | Dónde se ve |
+|---|---|---|---|
+| 1 | **Pedido por voz**: el mesero dicta el pedido (por la terminal ESP32 o desde el navegador) y aparece en Cocina | Modelo de lenguaje (LLM) multimodal: Gemini | Páginas **Voz** y **Cocina** |
+| 2 | **Ingreso con reconocimiento facial** | Visión por computador (deep learning) | Pantalla de ingreso |
+
+Ambas exponen endpoints de la API, se usan desde el frontend, registran métricas propias en Prometheus y las muestran en el dashboard de Grafana (`k8s/monitoreo/dashboard-trattoria.json`). La clave de Gemini se gestiona como Secret de Kubernetes (`GEMINI_API_KEY`) y nunca está en el repositorio.
+
+# Parte 1. Pedido por voz con Gemini
 
 ## El problema
 
-En el restaurante varias personas usan el mismo computador durante el turno: meseros, cocina y administración. Escribir usuario y contraseña cada vez es lento y lleva a malas prácticas, como dejar la sesión abierta o anotar la clave en un papel junto a la pantalla. Queríamos que cada persona pudiera entrar mirando a la cámara, que quedara registrado quién entró y cuándo, y que el usuario y la contraseña siguieran funcionando como respaldo.
+Un mesero con las manos ocupadas, en un salón ruidoso, apunta pedidos en papel o los teclea en una pantalla lejos de la mesa. Se pierde tiempo, se entienden mal las cantidades y el cocinero recibe el pedido con retraso. Queremos que el mesero **diga** el pedido ("mesa cinco, dos pizzas margherita y una limonada, sin hielo") y que llegue a la pantalla de cocina sin teclear, con una pregunta de aclaración cuando falte algo.
 
 ## Cómo funciona
+
+```mermaid
+sequenceDiagram
+    participant M as Mesero
+    participant E as ESP32 (INMP441) o navegador
+    participant A as API (FastAPI)
+    participant G as Gemini
+    participant B as PostgreSQL
+    participant C as Cocina (web)
+
+    M->>E: mantiene el botón y habla
+    E->>A: POST /api/v1/voz/audio (WAV 8 kHz) o /voz/interpretar (texto)
+    A->>B: lee menú disponible, mesas activas y el borrador de la sesión
+    A->>G: audio o texto + menú + mesas + borrador, respuesta en JSON
+    G-->>A: transcripción, mesa, productos, pregunta o confirmación
+    A->>A: valida contra la base (producto y mesa existentes, cantidades)
+    A-->>E: mensaje que muestra la OLED o lee el navegador
+    M->>E: "eso es todo"
+    A->>B: crea o amplía el pedido de la mesa
+    B-->>C: tiempo real (WebSocket): aparece la comanda
+```
+
+1. El audio llega como WAV mono de 8 kHz (la terminal) o el navegador reconoce la voz y manda el texto.
+2. La API arma un contexto con el **menú disponible**, las **mesas válidas** y el **borrador actual** del pedido de esa sesión, y se lo manda a Gemini junto con el audio o el texto.
+3. Gemini devuelve un JSON con lo que entendió. La API **no se fía de él**: cada producto y cada mesa se comprueba contra la base de datos. Lo que Gemini invente (un plato que no existe, una mesa inexistente) se descarta y se le pregunta al mesero.
+4. Si falta algo (mesa, producto ambiguo), la respuesta es una **pregunta de aclaración** y el borrador queda guardado en la tabla `voz_sesiones` para seguir en el siguiente audio.
+5. Cuando el mesero confirma, se crea el pedido (o se amplía el de la mesa si ya hay uno abierto) y queda visible en Cocina. Un pedido que ya está en cocina no se modifica (409).
+
+## El modelo y por qué lo escogimos
+
+- **Gemini Flash-Lite** (`gemini-flash-lite-latest`, con `gemini-3.1-flash-lite` de respaldo) por la API REST de Google AI. Es **multimodal**: entiende el audio directamente, así que no necesitamos un servicio de transcripción aparte ni un modelo de voz propio en un ESP32 sin memoria para ello.
+- Se escogió un modelo "lite" porque el pedido es una tarea corta y estructurada (extraer mesa, productos y cantidades) donde importa más la **latencia y el costo** que el razonamiento profundo. La temperatura es 0,1 para que sea lo más determinista posible.
+- La salida se pide como **JSON** (`responseMimeType: application/json`) y se valida: el modelo propone, la base de datos decide.
+- **Respaldo local por reglas** (`voz_service._interpretar_reglas`): si no hay clave, no hay red o Gemini está saturado, el texto escrito se entiende con un intérprete por palabras clave y similitud de texto contra el menú. Con **audio** no hay respaldo (no hay transcripción local): se responde un error claro.
+- Alternativas consideradas: Whisper local más reglas (más pesado de instalar y sin comprensión del contexto) y reconocimiento embebido en el ESP32 (vocabulario muy limitado).
+
+## Los datos
+
+- **No entrenamos un modelo.** Gemini se usa tal cual, con el prompt de sistema `PROMPT_SISTEMA`.
+- Los datos reales entran en el prompt en cada petición: el menú (`productos` disponibles), las mesas activas (`mesas`) y el borrador de la sesión (`voz_sesiones`).
+- No se guarda el audio ni la transcripción: el audio se procesa en memoria y se descarta. Lo que persiste es el pedido confirmado.
+- En la terminal, el audio se normaliza en el ESP32 (se quita el nivel DC y se amplifica hasta un tope) antes de enviarlo.
+
+## Cómo lo evaluamos
+
+- **Pruebas automáticas** (`backend/tests/test_voz.py`, `test_cocina.py`): validan el intérprete por reglas, la validación contra el menú (un producto inexistente no se inventa), las preguntas de aclaración, la confirmación, el contrato de errores, la clave del dispositivo, el borrador por sesión en base de datos y las métricas. Gemini se sustituye por un doble en las pruebas para que corran sin red.
+- **Prueba contra Gemini real** (`test_gemini_live.py`): se omite si no hay `GEMINI_API_KEY`.
+- **No hemos medido la precisión con audio real de meseros** en un salón con ruido. Es la medición pendiente más importante: grabar entre 30 y 50 pedidos reales y contar cuántos se entienden completos a la primera.
+
+## Métricas en Prometheus y Grafana
+
+| Métrica | Qué mide |
+|---|---|
+| `trattoria_voz_interpretaciones_total{motor,origen}` | Dictados entendidos, por motor (`gemini` o `reglas`) y origen (`audio` o `texto`) |
+| `trattoria_voz_interpretacion_seconds{motor}` | Latencia de entender un dictado (histograma; incluye la llamada a Gemini) |
+| `trattoria_voz_errores_total{origen}` | Dictados que no se pudieron procesar |
+| `trattoria_voz_pedidos_total{origen}` | Pedidos enviados a cocina por voz (`terminal` o `web`) |
+
+En el dashboard, la fila **"Pedidos por voz con Gemini (IA)"** muestra dictados entendidos, pedidos a cocina, porcentaje de respaldo local usado, errores, dictados por minuto y p50/p95 del tiempo de interpretación. `scripts/generar_trafico.ps1 -Dictados 6` mueve esas gráficas sin micrófono.
+
+## Limitaciones
+
+- **Costo y cuota.** La clave gratuita de Gemini tiene límites; con error 429 el servidor prueba el modelo de respaldo y, si también falla, responde un error (audio) o usa las reglas (texto). Si se usa una clave de pago hay que configurar un límite de gasto.
+- **Ruido y acento.** Un salón ruidoso o un micrófono mal cableado degradan la transcripción. La terminal imprime el pico de la señal para diagnosticarlo.
+- **Privacidad.** El audio de los meseros sale a un servicio externo (Google). Hay que informarlo al personal y, en producción, revisar las condiciones del plan de la API.
+- **El mesero debe nombrar el número de mesa.** No se infiere por la ubicación (aunque el localizador BLE podría usarse para eso).
+- **La terminal no identifica a quien habla:** se autentica con una clave de dispositivo (`X-Device-Key`), no con la voz del mesero.
+- **Precisión sin medir** con audio real (ver evaluación).
+
+## Mejoras posibles
+
+1. Medir la precisión con pedidos reales y ajustar el prompt con los errores encontrados.
+2. Usar el localizador BLE para sugerir la mesa más cercana al mesero.
+3. Confirmación por voz con lectura del pedido (el ESP32 ya tiene parlante).
+4. Un modelo de transcripción local de respaldo para que el audio también funcione sin internet.
+5. Una alerta en Grafana si el porcentaje de respaldo local sube, señal de que Gemini está fallando.
+
+# Parte 2. Ingreso con reconocimiento facial
+
+Esta parte explica la segunda funcionalidad de IA: el ingreso del personal con la cámara. La construyó Keiner (HU-23) y la medición en Prometheus y Grafana es parte de la HU-21.
+
+### El problema
+
+En el restaurante varias personas usan el mismo computador durante el turno: meseros, cocina y administración. Escribir usuario y contraseña cada vez es lento y lleva a malas prácticas, como dejar la sesión abierta o anotar la clave en un papel junto a la pantalla. Queríamos que cada persona pudiera entrar mirando a la cámara, que quedara registrado quién entró y cuándo, y que el usuario y la contraseña siguieran funcionando como respaldo.
+
+### Cómo funciona
 
 ```mermaid
 sequenceDiagram
@@ -42,7 +137,7 @@ Límites honestos: la pose y el parpadeo se calculan en el navegador, así que q
 
 El código está en `frontend-react/src/services/faceApi.js` (navegador) y en `backend/app/services/auth_service.py` (comparación).
 
-## El modelo y por qué lo escogimos
+### El modelo y por qué lo escogimos
 
 Usamos [`@vladmandic/face-api`](https://github.com/vladmandic/face-api), una versión mantenida de face-api.js que corre sobre TensorFlow.js. No entrenamos ningún modelo: usamos tres redes que ya vienen entrenadas.
 
@@ -61,7 +156,7 @@ Las razones:
 
 Escogimos SSD MobileNet v1 y no Tiny Face Detector, que también está en la carpeta, porque es más preciso y en un computador de escritorio la diferencia de velocidad no se nota.
 
-## Los datos
+### Los datos
 
 No usamos un dataset propio. Los datos son los de la aplicación:
 
@@ -71,7 +166,7 @@ No usamos un dataset propio. Los datos son los de la aplicación:
 | `rostro_plantillas` | Un descriptor de 128 números por cada posición registrada (`FRENTE`, `IZQUIERDA`, `DERECHA`, `ARRIBA`, `ABAJO`). Si se borra el usuario, se borran sus descriptores |
 | `auditoria_accesos` | Cada intento de ingreso: método (`ROSTRO` o `PASSWORD`), si fue exitoso, el motivo (`OK`, `ROSTRO_NO_RECONOCIDO`, `CREDENCIALES_INVALIDAS`, `CUENTA_BLOQUEADA`), la IP y la hora |
 
-## Cómo lo evaluamos
+### Cómo lo evaluamos
 
 **Pruebas automáticas.** En `backend/tests/test_auth.py` hay pruebas de la lógica de comparación: acepta un rostro cercano, rechaza uno lejano, rechaza cuando dos personas quedan casi igual de cerca, no acepta a nadie si no hay rostros registrados, escoge la posición más parecida de cada persona y exige posiciones distintas y un mínimo de tres. Corren junto con las demás pruebas del backend (48 en total).
 
@@ -105,7 +200,7 @@ ORDER BY metodo;
 
 **Lo que falta medir.** Todavía no hemos hecho una prueba formal con las personas del equipo frente a la cámara, porque no todos los computadores tienen una. La idea es esta: cada integrante registra su rostro y hace 10 intentos con luz normal, 5 con poca luz y 5 con gafas o tapabocas; anotamos cuántos fueron reconocidos (aciertos), cuántos no (falsos rechazos) y si alguno entró con la cuenta de otra persona (falsos aceptados). Ese último número es el más importante y debería ser cero.
 
-## Limitaciones
+### Limitaciones
 
 - **Fotos y videos.** El sistema compara caras, no comprueba que haya una persona real frente a la cámara, así que una foto en el celular podría servir para entrar. El componente de la cámara ya trae una prueba de parpadeo (`requiereParpadeo` en `CamaraFacial.jsx`), pero la pantalla de ingreso todavía no la activa.
 - **Luz, ángulo y accesorios.** Con poca luz, contraluz, gafas oscuras o tapabocas la detección falla más. Registrar varias posiciones ayuda, pero no lo resuelve del todo.
@@ -115,7 +210,7 @@ ORDER BY metodo;
 - **Datos personales.** En Colombia los datos biométricos son datos sensibles según la Ley 1581 de 2012. Antes de registrar el rostro de un empleado hay que pedirle autorización por escrito, explicarle para qué se usa y borrar sus descriptores si la retira o deja de trabajar en el restaurante (el administrador puede hacerlo con `DELETE /api/usuarios/{id}/rostro`).
 - **Precisión de la métrica de tiempo.** El histograma de la comparación empieza en 0,5 ms. Con pocos rostros registrados todas las comparaciones caen ahí, y Grafana muestra valores interpolados (250 µs y 475 µs); el tiempo real es menor.
 
-## Mejoras posibles
+### Mejoras posibles
 
 1. Activar la prueba de parpadeo en la pantalla de ingreso: es pasar `requiereParpadeo` al componente `CamaraFacial` en `LoginPage.jsx`.
 2. Hacer la prueba con el equipo descrita arriba y ajustar los umbrales con esos resultados.
