@@ -26,6 +26,10 @@ services:
       ENVIRONMENT: production
       AUTH_SECRET: ${AUTH_SECRET:?Configurar AUTH_SECRET en .env}
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      VOZ_DEVICE_KEY: ${VOZ_DEVICE_KEY:-}
+      FACE_UMBRAL: ${FACE_UMBRAL:-0.55}
+      FACE_UMBRAL_1A1: ${FACE_UMBRAL_1A1:-0.60}
     depends_on:
       db:
         condition: service_healthy

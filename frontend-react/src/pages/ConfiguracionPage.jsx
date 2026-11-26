@@ -37,7 +37,7 @@ function normalizarConfiguracion(datos = {}) {
   }
 }
 
-function ConfiguracionPage() {
+function ConfiguracionPage({ esAdmin = false }) {
   const [formulario, setFormulario] = useState(
     configuracionInicial,
   )
@@ -341,11 +341,21 @@ function ConfiguracionPage() {
         </div>
       )}
 
+      {!esAdmin && (
+        <div className="message-action" role="status">
+          Solo un administrador puede modificar la configuración. Aquí puedes consultarla.
+        </div>
+      )}
+
       <form
         className="config-form"
         onSubmit={guardarConfiguracion}
         noValidate
       >
+        <fieldset
+          disabled={!esAdmin}
+          style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: 'grid', gap: '24px' }}
+        >
         <section className="config-section">
           <div className="config-section-heading">
             <span className="config-section-number">
@@ -660,6 +670,7 @@ function ConfiguracionPage() {
               : 'Guardar configuración'}
           </button>
         </div>
+        </fieldset>
       </form>
     </div>
   )

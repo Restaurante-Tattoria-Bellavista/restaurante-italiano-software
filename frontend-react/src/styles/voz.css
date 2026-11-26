@@ -1,0 +1,100 @@
+/* Pagina "Pedido por voz". Todo va bajo .voz-page para no afectar otras vistas. */
+.voz-page {
+  --forest: var(--green-900);
+  --line: var(--border);
+}
+
+.voz-page .voz-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.voz-page .voz-control {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+}
+
+.voz-page .voz-error {
+  margin: 0 0 12px;
+  color: var(--red);
+  font-size: 0.9rem;
+}
+
+.voz-page .voz-rol {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.voz-page .voz-rol.mesero {
+  color: #315a83;
+  background: #e5eef8;
+}
+
+.voz-page .voz-rol.asistente {
+  color: #1a7c47;
+  background: var(--green-100);
+}
+
+/* ---- Tarjeta de la terminal ESP32 ---- */
+.terminales-esp32 {
+  margin-bottom: 20px;
+}
+
+.terminal-card {
+  border: 1px solid var(--line, #e3d8c6);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-top: 8px;
+  background: var(--surface, #fffdf8);
+}
+
+.terminal-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.terminal-estado {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.terminal-estado.en-linea {
+  color: #2f7d4f;
+}
+
+.terminal-estado.fuera {
+  color: #9c383b;
+}
+
+.terminal-card dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.terminal-card dt {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.terminal-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

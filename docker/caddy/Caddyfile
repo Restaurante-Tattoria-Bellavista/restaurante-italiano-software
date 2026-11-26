@@ -2,6 +2,13 @@
 #  - localhost (por defecto): HTTPS local con certificado interno de Caddy.
 #  - Un dominio publico (por ejemplo trattoria-bellavista.eastus2.cloudapp.azure.com):
 #    Caddy obtiene el certificado de Let's Encrypt automaticamente. Requiere abrir los puertos 80 y 443.
+# Dispositivos como el ESP32 se conectan por la IP del equipo y no envian nombre de servidor (SNI):
+# sin esto Caddy no sabe que certificado entregar y el saludo TLS falla. Con un dominio publico
+# (SITE_ADDRESS) se usa ese mismo dominio.
+{
+	default_sni {$SITE_ADDRESS:localhost}
+}
+
 {$SITE_ADDRESS:localhost} {
     encode gzip
     reverse_proxy frontend:80

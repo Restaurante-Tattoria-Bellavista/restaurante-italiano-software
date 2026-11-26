@@ -1,3 +1,5 @@
+import '../styles/solicitudes.css'
+
 const opcionesNavegacion = [
   {
     id: 'mesas',
@@ -35,6 +37,11 @@ const opcionesNavegacion = [
     icono: '♨',
   },
   {
+    id: 'voz',
+    nombre: 'Pedido por voz',
+    icono: '☏',
+  },
+  {
     id: 'reportes',
     nombre: 'Reportes',
     icono: '▥',
@@ -59,6 +66,7 @@ function Sidebar({
   cerrar,
   conectado,
   esAdmin = false,
+  solicitudesPendientes = 0,
 }) {
   const opciones = esAdmin
     ? [...opcionesNavegacion, opcionAdmin]
@@ -119,6 +127,15 @@ function Sidebar({
               </span>
 
               <span>{opcion.nombre}</span>
+
+              {opcion.id === 'usuarios' && solicitudesPendientes > 0 && (
+                <span
+                  className="nav-badge"
+                  aria-label={`${solicitudesPendientes} solicitudes de acceso pendientes`}
+                >
+                  {solicitudesPendientes}
+                </span>
+              )}
             </button>
           ))}
         </nav>

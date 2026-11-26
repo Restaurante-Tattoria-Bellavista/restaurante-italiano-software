@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react'
+import DecoracionZona from './DecoracionPlano'
+import MesaVisual from './MesaVisual'
+import '../styles/plano.css'
 
 const nombresEstados = {
   LIBRE: 'Libre',
@@ -166,26 +169,32 @@ function RestaurantMap({
         onPointerCancel={finalizarArrastre}
       >
         <section className="map-zone map-zone-terrace">
+          <DecoracionZona zona="terraza" />
           <span>Terraza</span>
         </section>
 
         <section className="map-zone map-zone-main">
+          <DecoracionZona zona="salon" />
           <span>Salón principal</span>
         </section>
 
         <section className="map-zone map-zone-bar">
+          <DecoracionZona zona="barra" />
           <span>Bar</span>
         </section>
 
         <section className="map-zone map-zone-vip">
+          <DecoracionZona zona="vip" />
           <span>Zona VIP</span>
         </section>
 
         <section className="map-zone map-zone-reception">
+          <DecoracionZona zona="recepcion" />
           <span>Recepción</span>
         </section>
 
         <section className="map-zone map-zone-kitchen">
+          <DecoracionZona zona="cocina" />
           <span>Cocina</span>
         </section>
 
@@ -248,15 +257,18 @@ function RestaurantMap({
                 seleccionarMesa(mesa.id)
               }
             >
-              <span>Mesa</span>
+              <MesaVisual
+                forma={layout.forma}
+                estado={mesa.estado}
+                capacidad={mesa.capacidad}
+                numero={mesa.numero}
+              />
 
-              <strong>{mesa.numero}</strong>
-
-              <small>
-                {guardando
-                  ? 'Guardando...'
-                  : `${mesa.capacidad} personas`}
-              </small>
+              {guardando && (
+                <small className="mesa-guardando">
+                  Guardando...
+                </small>
+              )}
             </button>
           )
         })}

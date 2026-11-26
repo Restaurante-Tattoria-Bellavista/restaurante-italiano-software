@@ -214,10 +214,43 @@ export const api = {
     })
   },
 
-  faceLogin(descriptor) {
+  faceChallenge() {
+    return request('/api/auth/face-challenge', { method: 'POST' })
+  },
+
+  faceLogin(challengeId, capturas, username) {
     return request('/api/auth/face-login', {
       method: 'POST',
-      body: JSON.stringify({ descriptor }),
+      body: JSON.stringify({
+        challenge_id: challengeId,
+        capturas,
+        ...(username ? { username } : {}),
+      }),
+    })
+  },
+
+  solicitarAcceso(datos) {
+    return request('/api/auth/registro', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    })
+  },
+
+  getSolicitudes(estado = 'PENDIENTE') {
+    return request(`/api/solicitudes?estado=${estado}`)
+  },
+
+  aprobarSolicitud(id, rol) {
+    return request(`/api/solicitudes/${id}/aprobar`, {
+      method: 'POST',
+      body: JSON.stringify({ rol }),
+    })
+  },
+
+  rechazarSolicitud(id, motivo) {
+    return request(`/api/solicitudes/${id}/rechazar`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo: motivo || null }),
     })
   },
 
@@ -244,6 +277,39 @@ export const api = {
         body: JSON.stringify({ plantillas }),
       },
     )
+  },
+
+  getComandas() {
+    return request('/api/v1/cocina/comandas')
+  },
+
+  changeOrderStatus(pedidoId, estado) {
+    return request(`/api/v1/pedidos/${pedidoId}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado }),
+    })
+  },
+
+  getVozEstado() {
+    return request('/api/v1/voz/estado')
+  },
+
+  getTerminalesVoz() {
+    return request('/api/v1/voz/terminales')
+  },
+
+  interpretarVoz(texto, borrador) {
+    return request('/api/v1/voz/interpretar', {
+      method: 'POST',
+      body: JSON.stringify({ texto, borrador }),
+    })
+  },
+
+  confirmarVoz(borrador) {
+    return request('/api/v1/voz/confirmar', {
+      method: 'POST',
+      body: JSON.stringify(borrador),
+    })
   },
 
   getUbicaciones() {

@@ -132,6 +132,20 @@ docker compose up -d --build # Actualiza servicios según Compose
 
 **No ejecutar `docker compose down -v` durante diagnóstico o actualización:** elimina los volúmenes gestionados y puede destruir los datos. El script `01-schema.sql` se aplica durante la inicialización de un directorio de PostgreSQL nuevo; **no** funciona como mecanismo automático de migración de una base persistente ya existente.
 
+## 4.5 Pedido por voz y terminal ESP32
+
+El mesero dicta el pedido (en el navegador o con una terminal ESP32 con micrófono). Gemini lo interpreta contra el menú y, si falta algo, pregunta; al confirmar se crea el pedido y aparece en **Cocina**. Sin `GEMINI_API_KEY` funciona un intérprete local por reglas, pero no el audio del ESP32.
+
+| Elemento | Detalle |
+|---|---|
+| Backend | `backend/app/routers/voz.py` y `backend/app/services/voz_service.py`; rutas `/api/v1/voz/*` y `GET /api/v1/cocina/comandas` |
+| Frontend | páginas **Pedido por voz** y **Cocina** (tablero con columnas por estado, en tiempo real) |
+| Firmware | `firmware/voice-terminal/` (PlatformIO); copiar `include/config.example.h` a `config.h` |
+| Variables | `GEMINI_API_KEY` (opcional) y `VOZ_DEVICE_KEY` (obligatoria para el ESP32), en `.env.docker.example` |
+| Detalle | `docs/REPORTE_IOT.md` y `docs/conexiones.html` (cableado) |
+
+La salida de Gemini no se toma como confiable: el servidor valida productos, mesa y cantidades antes de crear nada.
+
 ## 5. Despliegue en nube — procedimiento propuesto, NO certificado
 
 **Estado:** el equipo certificó en un equipo Windows el despliegue *local* de Docker; no se dispone en estas evidencias de URL pública, dominio, proveedor ni infraestructura de producción en la nube. Esta sección es una **guía operativa para realizar el despliegue**, no una afirmación de que ya está publicado.
@@ -274,14 +288,17 @@ Las imágenes que acompañan este README provienen de capturas del historial de 
 
 ---
 
-## Ingreso con reconocimiento facial
+## Autenticación e ingreso facial
 
-El sistema exige iniciar sesión. Hay dos formas de entrar:
+La API usa **JWT** (HS256) y toda la API de negocio exige sesión. Detalle completo, tabla de rutas protegidas, roles, secretos y guion de demostración en [`docs/autenticacion.md`](docs/autenticacion.md). El reconocimiento facial está explicado en [`docs/ia.md`](docs/ia.md).
 
-- **Reconocimiento facial:** la pantalla de ingreso activa la cámara y compara el rostro con los usuarios registrados. El análisis se hace en el navegador con `@vladmandic/face-api`; solo se envía al servidor un descriptor numérico de 128 valores, nunca la imagen.
-- **Usuario y contraseña:** respaldo cuando la cámara no está disponible o el rostro no se reconoce.
+Hay tres formas de llegar a una sesión:
 
-Roles: **ADMIN** (acceso total y gestión de usuarios) y **PERSONAL** (operación diaria).
+- **Usuario y contraseña.**
+- **Reconocimiento facial:** la cámara sigue un reto del servidor (varias poses en orden aleatorio) y compara el rostro con los usuarios registrados. El análisis se hace en el navegador con `@vladmandic/face-api`; al servidor solo llegan descriptores numéricos de 128 valores, nunca la imagen.
+- **Solicitar acceso:** desde la pantalla de ingreso cualquiera puede pedir una cuenta; un administrador la aprueba o la rechaza en **Usuarios y acceso**.
+
+Roles: **ADMIN** (usuarios, solicitudes, productos, configuración, creación de mesas y plano) y **PERSONAL** (operación diaria: pedidos, cocina, reservas, clientes).
 
 ### Configuración
 
@@ -306,7 +323,7 @@ Roles: **ADMIN** (acceso total y gestión de usuarios) y **PERSONAL** (operació
 ### Requisitos y limitaciones
 
 - **HTTPS o `localhost`:** los navegadores solo permiten la cámara en contextos seguros. La URL de Azure que usa `http://` no permitirá el ingreso facial hasta tener HTTPS.
-- **Sin detección de vida:** el sistema no distingue una persona real de una fotografía. Por eso la contraseña sigue siendo necesaria para los accesos sensibles.
+- **Detección de vida limitada:** el reto de poses aleatorias y la comprobación en el servidor dificultan el uso de una fotografía, pero la pose se calcula en el navegador; no reemplaza una detección de ataques de presentación hecha en el servidor. Más en `docs/ia.md`.
 - **Datos biométricos:** el descriptor facial es un dato sensible. Obtener el consentimiento de cada persona antes de registrar su rostro y cumplir la normativa aplicable de protección de datos.
-- **Intentos de ingreso:** no hay límite de intentos todavía; recomendado para una siguiente iteración.
-- Las sesiones duran 8 horas (`AUTH_TOKEN_TTL_SECONDS` configurable en código) y se cierran al reiniciar el backend si `AUTH_SECRET` cambia.
+- **Intentos de ingreso:** 10 fallos cada 10 minutos por IP, y 5 fallos seguidos bloquean la cuenta 15 minutos. Todo queda en `auditoria_accesos`.
+- Las sesiones duran 8 horas (`AUTH_TOKEN_TTL_SECONDS`) y se invalidan si `AUTH_SECRET` cambia. Con `ENVIRONMENT=production` el backend **no arranca** sin un `AUTH_SECRET` de al menos 32 caracteres.

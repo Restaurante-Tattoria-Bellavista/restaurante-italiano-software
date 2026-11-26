@@ -45,3 +45,7 @@ class LimitadorIntentos:
 # 10 fallos por IP cada 10 minutos para cada tipo de ingreso.
 limitador_login = LimitadorIntentos(maximo=10, ventana_segundos=600)
 limitador_face_login = LimitadorIntentos(maximo=10, ventana_segundos=600)
+# Cada reto emitido cuenta como un "fallo" para limitar cuantos se piden por minuto desde una IP.
+limitador_retos_faciales = LimitadorIntentos(maximo=30, ventana_segundos=60)
+# Solicitudes de cuenta desde la pantalla de ingreso: cada intento cuenta, 5 por hora y por IP.
+limitador_registro = LimitadorIntentos(maximo=5, ventana_segundos=3600)

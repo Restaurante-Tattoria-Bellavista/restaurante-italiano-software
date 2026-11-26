@@ -793,6 +793,29 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------
+-- Solicitudes de acceso: cuentas pedidas desde la pantalla de ingreso, pendientes de aprobacion
+-- por un administrador. La contrasena se guarda hasheada y se borra al aprobar. Idempotente.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS solicitudes_acceso (
+    id            SERIAL       NOT NULL,
+    username      VARCHAR(60)  NOT NULL,
+    nombre        VARCHAR(120) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    estado        VARCHAR(12)  NOT NULL DEFAULT 'PENDIENTE',
+    ip            VARCHAR(64),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    resuelta_at   TIMESTAMPTZ,
+    resuelta_por  VARCHAR(60),
+    motivo        VARCHAR(200),
+    CONSTRAINT pk_solicitudes_acceso PRIMARY KEY (id),
+    CONSTRAINT ck_solicitudes_estado CHECK (estado IN ('PENDIENTE', 'APROBADA', 'RECHAZADA'))
+);
+-- Una sola solicitud pendiente por usuario (protege tambien contra solicitudes simultaneas).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_solicitudes_pendiente_username
+    ON solicitudes_acceso (username) WHERE estado = 'PENDIENTE';
+CREATE INDEX IF NOT EXISTS ix_solicitudes_estado ON solicitudes_acceso (estado, created_at);
+
+-- ---------------------------------------------------------------------
 -- Ubicacion del personal con etiquetas BLE (gateways de zona).
 -- Solo guarda la zona actual de cada persona, sin historial. Idempotente.
 -- ---------------------------------------------------------------------

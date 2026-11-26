@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conexiones del terminal de voz</title>
+<style>
+  body { margin: 0; padding: 16px; font-family: Segoe UI, Arial, sans-serif; background: #fff; color: #222; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { font-size: 14px; line-height: 1.45; }
+  svg { width: 100%; max-width: 1100px; height: auto; display: block; border: 1px solid #ddd; border-radius: 8px; }
+  .nota { background: #fff7e0; border: 1px solid #f0d58a; padding: 8px 12px; border-radius: 8px; }
+  .alerta { background: #ffe9e7; border: 1px solid #e8a39d; padding: 8px 12px; border-radius: 8px; }
+  text { font-family: Segoe UI, Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Cómo conectar el terminal de voz</h1>
+<p class="alerta"><b>Importante:</b> el módulo azul de 3 pines (<code>OUT / GND / VCC</code>, chip LM393) solo detecta si hay ruido; <b>no graba voz</b>.
+Para que el asistente entienda lo que dices hace falta un micrófono <b>INMP441</b> (el que aparece abajo).</p>
+<p class="nota"><b>Regla de oro:</b> todo lo que termina en una <b>bolita negra (GND)</b> va al <b>mismo riel negro/azul (−)</b> de la protoboard,
+y todo lo que termina en una <b>bolita naranja (3V3)</b> va al <b>mismo riel rojo (+)</b>. Así el ESP32 solo usa un pin GND y un pin 3V3.
+El orden de los pines de tus placas puede variar: guíate por los <b>nombres impresos</b>.</p>
+
+<h2>1. Qué se conecta a qué</h2>
+<svg viewBox="0 0 1100 610" xmlns="http://www.w3.org/2000/svg">
+  <!-- ESP32 -->
+  <rect x="450" y="130" width="200" height="360" rx="10" fill="#1d2433" stroke="#000" stroke-width="2"/>
+  <text x="550" y="158" text-anchor="middle" fill="#fff" font-size="18" font-weight="700">ESP32</text>
+  <text x="550" y="178" text-anchor="middle" fill="#9fb0d0" font-size="11">(solo los pines que se usan)</text>
+  <g font-size="14" font-weight="700" fill="#fff">
+    <text x="462" y="199">VIN (5V)</text><text x="462" y="279">D25</text>
+    <text x="462" y="339">D32</text><text x="462" y="369">D33</text><text x="462" y="399">D27</text>
+  </g>
+  <g font-size="14" font-weight="700" fill="#fff" text-anchor="end">
+    <text x="638" y="199">3V3</text><text x="638" y="259">D21</text><text x="638" y="319">D22</text>
+    <text x="638" y="379">D4</text><text x="638" y="439">GND</text>
+  </g>
+
+  <!-- ===== Parlante ===== -->
+  <circle cx="145" cy="55" r="34" fill="#444" stroke="#000" stroke-width="2"/><circle cx="145" cy="55" r="12" fill="#888"/>
+  <text x="195" y="52" font-size="14" font-weight="700">Parlante 8 Ω</text>
+  <line x1="120" y1="86" x2="120" y2="130" stroke="#d62828" stroke-width="4"/>
+  <line x1="170" y1="86" x2="170" y2="130" stroke="#111" stroke-width="4"/>
+  <text x="74" y="112" font-size="12" fill="#d62828" font-weight="700">Lout +</text>
+  <text x="178" y="112" font-size="12" font-weight="700">Lout −</text>
+
+  <!-- ===== Amplificador ===== -->
+  <rect x="60" y="130" width="170" height="170" rx="8" fill="#2f8f5b" stroke="#000" stroke-width="2"/>
+  <text x="70" y="152" fill="#fff" font-size="14" font-weight="700">Amplificador</text>
+  <g font-size="12" fill="#fff" font-weight="700" text-anchor="end">
+    <text x="222" y="176">Power +</text><text x="222" y="204">Power −</text>
+    <text x="222" y="244">L (entrada)</text><text x="222" y="272">G (entrada)</text>
+  </g>
+  <polyline points="230,172 330,172 330,195 450,195" fill="none" stroke="#d62828" stroke-width="4"/>
+  <circle cx="450" cy="195" r="5" fill="#d62828"/>
+  <line x1="230" y1="200" x2="255" y2="200" stroke="#111" stroke-width="4"/>
+  <circle cx="266" cy="200" r="12" fill="#111"/><text x="266" y="203" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+  <polyline points="230,240 390,240 390,275 450,275" fill="none" stroke="#1b9e3a" stroke-width="4"/>
+  <circle cx="450" cy="275" r="5" fill="#1b9e3a"/>
+  <line x1="230" y1="268" x2="255" y2="268" stroke="#111" stroke-width="4"/>
+  <circle cx="266" cy="268" r="12" fill="#111"/><text x="266" y="271" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+
+  <!-- ===== Microfono INMP441 ===== -->
+  <rect x="60" y="330" width="170" height="200" rx="8" fill="#2a5db0" stroke="#000" stroke-width="2"/>
+  <text x="70" y="352" fill="#fff" font-size="14" font-weight="700">Micrófono INMP441</text>
+  <g font-size="12" fill="#fff" font-weight="700" text-anchor="end">
+    <text x="222" y="379">VDD</text><text x="222" y="407">GND</text><text x="222" y="435">L/R</text>
+    <text x="222" y="463">SD</text><text x="222" y="491">WS</text><text x="222" y="519">SCK</text>
+  </g>
+  <line x1="230" y1="375" x2="255" y2="375" stroke="#f08a00" stroke-width="4"/>
+  <circle cx="266" cy="375" r="12" fill="#f08a00"/><text x="266" y="378" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">3V3</text>
+  <line x1="230" y1="403" x2="255" y2="403" stroke="#111" stroke-width="4"/>
+  <circle cx="266" cy="403" r="12" fill="#111"/><text x="266" y="406" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+  <line x1="230" y1="431" x2="255" y2="431" stroke="#111" stroke-width="4"/>
+  <circle cx="266" cy="431" r="12" fill="#111"/><text x="266" y="434" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+  <!-- SD -> D32 -->
+  <polyline points="230,459 300,459 300,335 450,335" fill="none" stroke="#8e44ad" stroke-width="4"/>
+  <circle cx="450" cy="335" r="5" fill="#8e44ad"/>
+  <!-- WS -> D33 -->
+  <polyline points="230,487 330,487 330,365 450,365" fill="none" stroke="#7cb342" stroke-width="4"/>
+  <circle cx="450" cy="365" r="5" fill="#7cb342"/>
+  <!-- SCK -> D27 -->
+  <polyline points="230,515 360,515 360,395 450,395" fill="none" stroke="#6d4c41" stroke-width="4"/>
+  <circle cx="450" cy="395" r="5" fill="#6d4c41"/>
+
+  <!-- ===== OLED ===== -->
+  <rect x="880" y="130" width="170" height="230" rx="8" fill="#222" stroke="#000" stroke-width="2"/>
+  <rect x="940" y="150" width="100" height="50" fill="#4aa3ff"/><text x="990" y="180" text-anchor="middle" font-size="12" fill="#fff">OLED</text>
+  <g font-size="12" fill="#fff" font-weight="700">
+    <text x="890" y="241">VCC</text><text x="890" y="281">SDA</text><text x="890" y="321">SCL</text><text x="890" y="351">GND</text>
+  </g>
+  <line x1="880" y1="237" x2="845" y2="237" stroke="#f08a00" stroke-width="4"/>
+  <circle cx="834" cy="237" r="12" fill="#f08a00"/><text x="834" y="240" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">3V3</text>
+  <polyline points="650,255 760,255 760,277 880,277" fill="none" stroke="#0aa5a5" stroke-width="4"/>
+  <polyline points="650,315 790,315 790,317 880,317" fill="none" stroke="#e0b000" stroke-width="4"/>
+  <circle cx="650" cy="255" r="5" fill="#0aa5a5"/><circle cx="650" cy="315" r="5" fill="#e0b000"/>
+  <line x1="880" y1="347" x2="845" y2="347" stroke="#111" stroke-width="4"/>
+  <circle cx="834" cy="347" r="12" fill="#111"/><text x="834" y="350" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+
+  <!-- ===== Boton ===== -->
+  <rect x="880" y="400" width="170" height="100" rx="8" fill="#b02a2a" stroke="#000" stroke-width="2"/>
+  <text x="890" y="422" fill="#fff" font-size="14" font-weight="700">Botón</text>
+  <g font-size="12" fill="#fff" font-weight="700"><text x="890" y="451">terminal 1</text><text x="890" y="486">terminal 2</text></g>
+  <polyline points="650,375 700,375 700,447 880,447" fill="none" stroke="#c2185b" stroke-width="4"/>
+  <circle cx="650" cy="375" r="5" fill="#c2185b"/>
+  <line x1="880" y1="482" x2="845" y2="482" stroke="#111" stroke-width="4"/>
+  <circle cx="834" cy="482" r="12" fill="#111"/><text x="834" y="485" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+
+  <!-- ESP32: GND y 3V3 a los rieles -->
+  <line x1="650" y1="435" x2="715" y2="435" stroke="#111" stroke-width="4"/>
+  <circle cx="727" cy="435" r="12" fill="#111"/><text x="727" y="438" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">GND</text>
+  <line x1="650" y1="195" x2="715" y2="195" stroke="#f08a00" stroke-width="4"/>
+  <circle cx="727" cy="195" r="12" fill="#f08a00"/><text x="727" y="198" text-anchor="middle" fill="#fff" font-size="8" font-weight="800">3V3</text>
+
+  <!-- leyenda -->
+  <g font-size="12" transform="translate(60,580)">
+    <circle cx="8" cy="0" r="8" fill="#111"/><text x="24" y="4">= va al riel NEGRO/AZUL (−)</text>
+    <circle cx="238" cy="0" r="8" fill="#f08a00"/><text x="254" y="4">= va al riel ROJO (+) de 3V3</text>
+    <text x="500" y="4">Los demás cables (de colores) van directo al pin del ESP32 donde termina la línea.</text>
+  </g>
+</svg>
+
+<h2>2. Cómo se ve el "riel" en la protoboard (aquí se juntan todos los GND)</h2>
+<p>Cada tira de agujeros del borde de la protoboard está unida por dentro. Clavas <b>un</b> cable desde el ESP32 y cuantos cables necesites desde las piezas.</p>
+<svg viewBox="0 0 1100 330" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="agRojo" width="20" height="34" patternUnits="userSpaceOnUse" x="70"><circle cx="10" cy="17" r="4" fill="#c0392b"/></pattern>
+    <pattern id="agAzul" width="20" height="34" patternUnits="userSpaceOnUse" x="70"><circle cx="10" cy="17" r="4" fill="#2a5db0"/></pattern>
+  </defs>
+  <rect x="60" y="100" width="980" height="34" rx="6" fill="#fde8e8" stroke="#c0392b" stroke-width="2"/>
+  <rect x="60" y="100" width="980" height="34" fill="url(#agRojo)"/>
+  <text x="70" y="158" font-size="14" font-weight="700" fill="#c0392b">Riel ROJO (+) = 3V3</text>
+  <rect x="60" y="190" width="980" height="34" rx="6" fill="#e3ecff" stroke="#2a5db0" stroke-width="2"/>
+  <rect x="60" y="190" width="980" height="34" fill="url(#agAzul)"/>
+  <text x="70" y="182" font-size="14" font-weight="700" fill="#2a5db0">Riel NEGRO/AZUL (−) = GND</text>
+
+  <g stroke="#f08a00" stroke-width="4">
+    <line x1="200" y1="117" x2="200" y2="35"/><line x1="460" y1="117" x2="460" y2="35"/><line x1="720" y1="117" x2="720" y2="35"/>
+  </g>
+  <g font-size="13" font-weight="700" text-anchor="middle">
+    <text x="200" y="26">ESP32 · pin 3V3</text><text x="460" y="26">OLED · VCC</text><text x="720" y="26">INMP441 · VDD</text>
+  </g>
+
+  <g stroke="#111" stroke-width="4">
+    <line x1="100" y1="207" x2="100" y2="285"/><line x1="240" y1="207" x2="240" y2="285"/><line x1="380" y1="207" x2="380" y2="285"/>
+    <line x1="520" y1="207" x2="520" y2="285"/><line x1="660" y1="207" x2="660" y2="285"/><line x1="800" y1="207" x2="800" y2="285"/>
+    <line x1="940" y1="207" x2="940" y2="285"/>
+  </g>
+  <g font-size="12" font-weight="700" text-anchor="middle">
+    <text x="100" y="305">ESP32 · GND</text><text x="240" y="305">OLED · GND</text><text x="380" y="305">INMP441 · GND</text>
+    <text x="520" y="305">INMP441 · L/R</text><text x="660" y="305">Amplif. · Power −</text><text x="800" y="305">Amplif. · G</text>
+    <text x="940" y="305">Botón · terminal 2</text>
+  </g>
+</svg>
+
+<h2>3. Lo que NO va al riel</h2>
+<ul>
+  <li><b>Power + del amplificador</b> → directo al pin <b>VIN</b> del ESP32 (no al riel de 3V3).</li>
+  <li><b>No conectes el adaptador negro de pared.</b> Todo se alimenta por el cable USB del ESP32.</li>
+  <li>El micrófono INMP441 va a <b>3V3</b>, nunca a 5V.</li>
+  <li>El módulo azul de 3 pines (OUT/GND/VCC) <b>no se usa</b> para la voz.</li>
+</ul>
+
+<h2>4. Soldaduras que necesitas</h2>
+<ul>
+  <li><b>Amplificador:</b> sus conexiones son solo agujeros. Hay que soldarles cables o pines (en una tienda de electrónica lo hacen por poco dinero).</li>
+  <li><b>Parlante:</b> suelda un cable a cada terminal. No importa cuál es + o −, solo que Lout+ y Lout− vayan a los dos.</li>
+  <li><b>Botón:</b> suelda un cable a cada terminal.</li>
+</ul>
+
+</body>
+</html>

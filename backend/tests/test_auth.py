@@ -28,7 +28,7 @@ def test_verify_password_rechaza_hash_nulo_o_malformado():
 def test_token_ida_y_vuelta_y_firma_invalida():
     token = create_token(7, "ADMIN", "secreto-prueba", 60)
     claims = decode_token(token, "secreto-prueba")
-    assert claims["sub"] == 7 and claims["rol"] == "ADMIN"
+    assert claims["sub"] == "7" and claims["rol"] == "ADMIN"  # sub es texto, como pide el RFC 7519
     assert decode_token(token, "otro-secreto") is None
     assert decode_token("basura", "secreto-prueba") is None
 

@@ -66,6 +66,18 @@ spec:
                   name: trattoria-secret
                   key: GATEWAY_TOKEN
                   optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: GEMINI_API_KEY
+                  optional: true
+            - name: VOZ_DEVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trattoria-secret
+                  key: VOZ_DEVICE_KEY
+                  optional: true
           # readiness: el pod solo recibe tráfico cuando puede hablar con la base.
           readinessProbe:
             httpGet:

@@ -9,6 +9,15 @@ export const UMBRAL_GIRO = 0.18
 export const RAZON_ARRIBA = 0.33
 export const RAZON_ABAJO = 0.5
 
+// Tamaño del rostro respecto al alto del cuadro (0 a 1). Fuera de este rango el descriptor se vuelve
+// ruidoso: lejos hay pocos píxeles y muy cerca se recorta la frente o el mentón. Aproximados:
+// la pantalla los muestra para poder ajustarlos con la cámara real.
+export const TAMANO_MIN = 0.3
+export const TAMANO_MAX = 0.7
+// Confianza mínima del detector y desviación máxima del centro (fracción del ancho) para usar un cuadro.
+export const PUNTAJE_MIN = 0.8
+export const DESCENTRADO_MAX = 0.2
+
 let cargaModelos = null
 
 export function cargarModelosFaciales() {
@@ -78,7 +87,45 @@ export function estimarPose(landmarks) {
   }
 }
 
-// Devuelve el descriptor, la pose estimada y la apertura de los ojos (para parpadeo).
+// Instrucción para cada pose, tal como se muestra a la persona.
+export const TEXTO_POSE = {
+  FRENTE: 'Mira de frente a la cámara.',
+  IZQUIERDA: 'Gira la cabeza despacio hacia tu izquierda.',
+  DERECHA: 'Gira la cabeza despacio hacia tu derecha.',
+  ARRIBA: 'Levanta un poco la barbilla, mirando hacia arriba.',
+  ABAJO: 'Baja un poco la cabeza, mirando hacia abajo.',
+}
+
+// Evalúa si un cuadro sirve para reconocer. Devuelve null si es bueno o el consejo para el usuario.
+// poseEsperada: exigir esa pose (login con reto); null = cualquiera (el registro valida la pose aparte).
+export function evaluarCalidad(rostro, { poseEsperada = null } = {}) {
+  if (rostro.puntaje < PUNTAJE_MIN) {
+    return 'Mejora la iluminación o mira a la cámara.'
+  }
+  if (rostro.tamano < TAMANO_MIN) {
+    return 'Acércate un poco a la cámara.'
+  }
+  if (rostro.tamano > TAMANO_MAX) {
+    return 'Aléjate un poco de la cámara.'
+  }
+  if (rostro.descentrado > DESCENTRADO_MAX) {
+    return 'Centra tu rostro en la imagen.'
+  }
+  if (poseEsperada && rostro.pose !== poseEsperada) {
+    return TEXTO_POSE[poseEsperada] || 'Ajusta la posición de la cabeza.'
+  }
+  return null
+}
+
+// Promedia varios descriptores de la misma persona: reduce el ruido de un solo cuadro.
+export function promediarDescriptores(descriptores) {
+  const n = descriptores.length
+  return descriptores[0].map(
+    (_, i) => descriptores.reduce((suma, d) => suma + d[i], 0) / n,
+  )
+}
+
+// Devuelve el descriptor, la pose estimada, la apertura de los ojos (para parpadeo) y la calidad del cuadro.
 export async function extraerRostro(video) {
   const deteccion = await faceapi
     .detectSingleFace(
@@ -97,9 +144,24 @@ export async function extraerRostro(video) {
       relacionOjo(deteccion.landmarks.getRightEye())) /
     2
 
+  const caja = deteccion.detection.box
+  const anchoVideo = video.videoWidth || 1
+  const altoVideo = video.videoHeight || 1
+
   return {
     descriptor: Array.from(deteccion.descriptor),
     ojos,
+    puntaje: deteccion.detection.score,
+    caja: {
+      x: caja.x / anchoVideo,
+      y: caja.y / altoVideo,
+      ancho: caja.width / anchoVideo,
+      alto: caja.height / altoVideo,
+    },
+    tamano: Number((caja.height / altoVideo).toFixed(3)),
+    descentrado: Number(
+      Math.abs((caja.x + caja.width / 2) / anchoVideo - 0.5).toFixed(3),
+    ),
     ...estimarPose(deteccion.landmarks),
   }
 }

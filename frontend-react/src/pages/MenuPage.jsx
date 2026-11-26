@@ -38,7 +38,7 @@ function formatearDinero(valor) {
   }).format(Number(valor || 0))
 }
 
-function MenuPage() {
+function MenuPage({ esAdmin = false }) {
   const [productos, setProductos] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] =
@@ -272,13 +272,15 @@ function MenuPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={abrirNuevoProducto}
-          >
-            + Nuevo producto
-          </button>
+          {esAdmin && (
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={abrirNuevoProducto}
+            >
+              + Nuevo producto
+            </button>
+          )}
         </div>
 
         <div className="products-toolbar">
@@ -414,37 +416,39 @@ function MenuPage() {
                       </strong>
                     </div>
 
-                    <div className="product-actions">
-                      <button
-                        type="button"
-                        className="action-button"
-                        disabled={procesando}
-                        onClick={() =>
-                          abrirEdicion(producto)
-                        }
-                      >
-                        Editar
-                      </button>
+                    {esAdmin && (
+                      <div className="product-actions">
+                        <button
+                          type="button"
+                          className="action-button"
+                          disabled={procesando}
+                          onClick={() =>
+                            abrirEdicion(producto)
+                          }
+                        >
+                          Editar
+                        </button>
 
-                      <button
-                        type="button"
-                        className={
-                          disponible
-                            ? 'action-button danger'
-                            : 'action-button success'
-                        }
-                        disabled={procesando}
-                        onClick={() =>
-                          cambiarDisponibilidad(producto)
-                        }
-                      >
-                        {procesando
-                          ? 'Procesando...'
-                          : disponible
-                            ? 'Desactivar'
-                            : 'Activar'}
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          className={
+                            disponible
+                              ? 'action-button danger'
+                              : 'action-button success'
+                          }
+                          disabled={procesando}
+                          onClick={() =>
+                            cambiarDisponibilidad(producto)
+                          }
+                        >
+                          {procesando
+                            ? 'Procesando...'
+                            : disponible
+                              ? 'Desactivar'
+                              : 'Activar'}
+                        </button>
+                      </div>
+                    )}
                   </article>
                 )
               })}

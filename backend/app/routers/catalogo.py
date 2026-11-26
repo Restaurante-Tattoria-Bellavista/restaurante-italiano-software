@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, insert, update, func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+from app.core.dependencies import require_admin
 from app.db.session import get_db
 from app.models.catalogo import mesas, mesa_layout, productos
 from app.schemas.catalogo import (
@@ -37,7 +38,7 @@ def listar_mesas(db: Session = Depends(get_db)):
     return db.execute(select(mesas).order_by(mesas.c.numero)).mappings().all()
 
 
-@router.post("/mesas", response_model=MesaRead, status_code=status.HTTP_201_CREATED)
+@router.post("/mesas", response_model=MesaRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def crear_mesa(payload: MesaCreate, db: Session = Depends(get_db)):
     result = _save(db, insert(mesas).values(**payload.model_dump()).returning(mesas.c.id))
     return _fetch(db, mesas, "id", result.scalar_one())
@@ -63,7 +64,7 @@ def obtener_layout(mesa_id: int, db: Session = Depends(get_db)):
     return _fetch(db, mesa_layout, "mesa_id", mesa_id)
 
 
-@router.put("/mesas/{mesa_id}/layout", response_model=LayoutRead)
+@router.put("/mesas/{mesa_id}/layout", response_model=LayoutRead, dependencies=[Depends(require_admin)])
 def guardar_layout(mesa_id: int, payload: LayoutUpsert, db: Session = Depends(get_db)):
     _fetch(db, mesas, "id", mesa_id)
     exists = db.execute(select(mesa_layout.c.mesa_id).where(mesa_layout.c.mesa_id == mesa_id)).scalar_one_or_none()
@@ -81,7 +82,7 @@ def listar_productos(db: Session = Depends(get_db)):
     return db.execute(select(productos).order_by(productos.c.id)).mappings().all()
 
 
-@router.post("/productos", response_model=ProductoRead, status_code=status.HTTP_201_CREATED)
+@router.post("/productos", response_model=ProductoRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
     result = _save(db, insert(productos).values(**payload.model_dump()).returning(productos.c.id))
     return _fetch(db, productos, "id", result.scalar_one())
@@ -92,7 +93,7 @@ def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
     return _fetch(db, productos, "id", producto_id)
 
 
-@router.patch("/productos/{producto_id}", response_model=ProductoRead)
+@router.patch("/productos/{producto_id}", response_model=ProductoRead, dependencies=[Depends(require_admin)])
 def editar_producto(producto_id: int, payload: ProductoUpdate, db: Session = Depends(get_db)):
     _fetch(db, productos, "id", producto_id)
     changes = payload.model_dump(exclude_unset=True)

@@ -45,3 +45,19 @@ auditoria_accesos = Table(
     Column("ip", String(64)),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
+
+# Cuentas pedidas desde la pantalla de ingreso. Quedan PENDIENTES hasta que un administrador las resuelve.
+solicitudes_acceso = Table(
+    "solicitudes_acceso", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("username", String(60), nullable=False),
+    Column("nombre", String(120), nullable=False),
+    Column("password_hash", String(255), nullable=False),
+    Column("estado", String(12), nullable=False, server_default="PENDIENTE"),
+    Column("ip", String(64)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("resuelta_at", DateTime(timezone=True)),
+    Column("resuelta_por", String(60)),
+    Column("motivo", String(200)),
+    CheckConstraint("estado IN ('PENDIENTE', 'APROBADA', 'RECHAZADA')", name="ck_solicitudes_estado"),
+)

@@ -1,0 +1,198 @@
+/* Pantalla de cocina (KDS). Todo va bajo .kds para no afectar otras vistas. */
+
+/* Alias: este archivo usa nombres de variables que en el proyecto se llaman distinto. */
+.kds,
+.voz-page {
+  --forest: var(--green-900);
+  --line: var(--border);
+}
+
+
+.kds-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.kds-header h2 {
+  margin: 0 0 4px;
+  font: 28px Georgia, serif;
+}
+
+.kds-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kds-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kds-alert {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #e8bdbc;
+  border-radius: 9px;
+  color: #8f2f31;
+  background: #fff3f1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kds-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.kds-column {
+  min-height: 60vh;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #f8f6f0;
+}
+
+.kds-column-title {
+  padding: 11px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.kds-column-title strong {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+.kds-column-title.pending { color: #76551a; background: #fff0c7; }
+.kds-column-title.preparing { color: #9c383b; background: #f8dede; }
+.kds-column-title.ready { color: #1e7147; background: #dff3e7; }
+
+.kds-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.kds-empty {
+  padding: 28px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---- tarjeta ---- */
+.kds-ticket {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 7px solid #9bb7a8;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 5px 14px rgba(44, 37, 26, 0.06);
+}
+
+.kds-ticket.atencion { border-left-color: #e0a52a; background: #fffaf0; }
+.kds-ticket.retraso { border-left-color: #c0392b; background: #fff4f2; }
+.kds-ticket.listo { border-left-color: #2e9d62; background: #f3fbf6; }
+
+.kds-ticket.nuevo {
+  animation: kds-pulso 1.1s ease-in-out infinite;
+}
+
+@keyframes kds-pulso {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 165, 42, 0.65); }
+  50% { box-shadow: 0 0 0 7px rgba(224, 165, 42, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kds-ticket.nuevo { animation: none; outline: 3px solid #e0a52a; }
+}
+
+.kds-ticket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.kds-mesa { display: flex; align-items: baseline; gap: 6px; }
+.kds-mesa small { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 0.12em; }
+.kds-mesa strong { font: 700 38px/1 Georgia, serif; }
+
+.kds-meta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.kds-meta small { color: var(--muted); font-size: 10px; }
+.kds-espera { font-size: 13px; font-weight: 800; }
+.kds-ticket.atencion .kds-espera { color: #8a5d00; }
+.kds-ticket.retraso .kds-espera { color: #b02a1f; }
+
+.kds-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #d9822b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.kds-items { display: grid; gap: 8px; margin: 6px 0 12px; }
+
+.kds-categoria {
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.kds-item {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #e2ddd3;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.kds-item:last-child { border-bottom: 0; }
+.kds-cantidad { min-width: 34px; font-weight: 900; color: var(--forest); }
+.kds-nombre { font-weight: 650; }
+
+.kds-nota {
+  display: block;
+  margin-top: 2px;
+  color: #a4510f;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.kds-accion { min-height: 46px; font-size: 14px; }
+
+@media (max-width: 980px) {
+  .kds-board { grid-template-columns: 1fr; }
+  .kds-column { min-height: 0; }
+}

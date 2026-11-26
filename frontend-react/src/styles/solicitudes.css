@@ -1,0 +1,176 @@
+/* Solicitudes de acceso: formulario de ingreso, panel del administrador y aviso en el menú. */
+
+.solicitud-enviada {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.solicitud-enviada h2 {
+  margin: 0;
+  color: #0f3e33;
+}
+
+.solicitud-enviada p {
+  margin: 0;
+}
+
+.solicitud-icono {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 1.8rem;
+}
+
+.solicitudes-acceso {
+  margin: 20px 0 28px;
+  padding: 18px 20px;
+  border: 1px solid #e5ddd2;
+  border-radius: 16px;
+  background: #fffdf9;
+}
+
+.solicitudes-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.solicitudes-cabecera h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.solicitudes-contador,
+.nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #c9564f;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.nav-badge {
+  margin-left: auto;
+}
+
+.solicitudes-lista {
+  display: grid;
+  gap: 12px;
+}
+
+.solicitud-tarjeta {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #eadfcf;
+  border-left: 5px solid #d59a18;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.solicitud-datos {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.solicitud-datos span {
+  color: #6c756f;
+  font-size: 0.85rem;
+}
+
+.solicitud-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.solicitud-acciones label {
+  display: grid;
+  gap: 4px;
+  color: #6c756f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.solicitud-acciones select,
+.solicitud-acciones input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d9cfc2;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-weight: 400;
+}
+
+.solicitud-acciones label:nth-child(2) {
+  flex: 1 1 200px;
+}
+
+.solicitud-botones {
+  display: flex;
+  gap: 8px;
+}
+
+.solicitudes-historial {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #d9cfc2;
+}
+
+.solicitudes-historial h4 {
+  margin: 0 0 8px;
+}
+
+.solicitudes-historial ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+}
+
+.solicitud-estado {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.solicitud-estado.aprobada {
+  background: #e7f3e9;
+  color: #2e7d32;
+}
+
+.solicitud-estado.rechazada {
+  background: #fbe9e7;
+  color: #b23a32;
+}
+
+@media (max-width: 760px) {
+  .solicitud-tarjeta {
+    grid-template-columns: 1fr;
+  }
+}

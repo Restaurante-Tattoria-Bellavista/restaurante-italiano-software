@@ -15,20 +15,30 @@ sequenceDiagram
     participant A as API (FastAPI)
     participant B as PostgreSQL
 
-    C->>N: imagen de la cámara
-    N->>N: detecta la cara, ubica 68 puntos<br/>y calcula un descriptor de 128 números
-    N->>A: POST /api/auth/face-login (solo el descriptor)
+    N->>A: POST /api/auth/face-challenge
+    A-->>N: reto de un solo uso: 3 poses en orden aleatorio, vigente 60 s
+    loop por cada pose pedida
+        C->>N: imagen de la cámara
+        N->>N: detecta la cara, valida calidad y pose<br/>y promedia 3 cuadros en un descriptor de 128 números
+    end
+    N->>A: POST /api/auth/face-login (reto + descriptores, y usuario opcional)
+    A->>A: consume el reto, comprueba poses y variación entre capturas
     A->>B: descriptores registrados de los usuarios activos
-    A->>A: compara por distancia euclidiana
-    A->>B: guarda el intento en auditoria_accesos
+    A->>A: compara todas las capturas (mediana de la distancia)
+    A->>B: guarda el intento y la distancia en auditoria_accesos
     A-->>N: sesión iniciada, o 401 si no lo reconoce
 ```
 
-1. **Registro.** Un administrador abre *Usuarios y acceso* y registra el rostro de cada empleado. El asistente pide cinco posiciones (de frente, izquierda, derecha, arriba y abajo) y exige al menos tres. Por cada posición se guarda un descriptor en la tabla `rostro_plantillas` con `PUT /api/usuarios/{id}/rostro`.
-2. **Ingreso.** En la pantalla de inicio de sesión la cámara toma una imagen cada 1,2 segundos. Cuando el navegador encuentra una cara, calcula su descriptor y lo envía a `POST /api/auth/face-login`. La imagen nunca sale del computador.
-3. **Comparación.** La API calcula la distancia entre el descriptor recibido y cada plantilla. Para cada persona toma la menor distancia entre sus posiciones registradas y se queda con la persona más cercana, pero solo la acepta si:
-   - la distancia es de **0,55 o menos** (face-api.js propone 0,6; bajamos un poco el umbral para que sea más difícil entrar con la cuenta de otro), y
+1. **Registro.** Un administrador abre *Usuarios y acceso* y registra el rostro de cada empleado. El asistente pide cinco posiciones (de frente, izquierda, derecha, arriba y abajo) y exige al menos tres. Cada posición se captura a la distancia correcta y es el promedio de 4 cuadros. Se guardan en la tabla `rostro_plantillas` con `PUT /api/usuarios/{id}/rostro`. El servidor rechaza el registro si las posiciones no parecen ser de la misma persona o si ese rostro ya está registrado a otro usuario.
+2. **Guía de calidad.** Antes de usar un cuadro, el navegador comprueba que el detector esté seguro, que el rostro esté centrado y a buena distancia (ni lejos ni demasiado cerca) y que tenga la pose pedida. Si no, le dice a la persona qué corregir. La cámara pide 1280×720 para que a distancia el rostro conserve detalle.
+3. **Reto.** Al abrir el ingreso, el servidor entrega un reto de un solo uso: las poses de frente, izquierda y derecha en orden aleatorio. Vence a los 60 s, está ligado a la IP y no puede reutilizarse. La persona hace cada pose; el navegador envía todas las capturas juntas.
+4. **Verificación en el servidor.** La API comprueba que las capturas sean exactamente las del reto, en ese orden, y que no sean casi idénticas entre sí (una foto fija o un vector repetido produce descriptores iguales). Para cada persona usa la **mediana** de la distancia de sus capturas a su plantilla más cercana, y solo la acepta si:
+   - la mediana es de **0,55 o menos** (`FACE_UMBRAL`; face-api.js propone 0,6), y ninguna captura se aleja más de 0,10 de ese umbral, y
    - la segunda persona más cercana está al menos **0,05** más lejos. Si dos personas quedan casi igual de cerca, no deja entrar a ninguna.
+5. **Ingreso 1:1 (recomendado).** Si la persona escribe su usuario, solo se compara contra su propio rostro (umbral `FACE_UMBRAL_1A1`, 0,60) y los fallos cuentan para el bloqueo de la cuenta (5 fallos, 15 minutos), igual que con la contraseña.
+6. **Auditoría.** Cada intento queda en `auditoria_accesos` con su motivo y la distancia medida (`OK d=0.41`, `ROSTRO_NO_RECONOCIDO d=0.71`). Sirve para calibrar los umbrales con datos reales.
+
+Límites honestos: la pose y el parpadeo se calculan en el navegador, así que quien tenga acceso directo a la API y los descriptores de la víctima en tres poses podría enviarlos. El reto y la comprobación de variación suben mucho el costo del ataque, pero no reemplazan una detección de ataques de presentación hecha en el servidor. Los descriptores se guardan sin cifrar en `rostro_plantillas`.
 
 El código está en `frontend-react/src/services/faceApi.js` (navegador) y en `backend/app/services/auth_service.py` (comparación).
 

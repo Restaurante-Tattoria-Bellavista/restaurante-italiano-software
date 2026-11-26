@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import RegistroRostroWizard from '../components/RegistroRostroWizard'
+import SolicitudesAcceso from '../components/SolicitudesAcceso'
 import { api } from '../services/api'
 
 const MENSAJES_CAMPO = {
@@ -137,6 +138,8 @@ function UsuariosPage() {
         </p>
       )}
       {mensaje && <p role="status">{mensaje}</p>}
+
+      <SolicitudesAcceso onResuelta={cargarUsuarios} />
 
       <form className="dialog-form" onSubmit={crearUsuario}>
         <label className="form-field">

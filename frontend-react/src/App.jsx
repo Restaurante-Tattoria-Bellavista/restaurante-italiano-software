@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
 import ClientesPage from './pages/ClientesPage'
+import CocinaPage from './pages/CocinaPage'
 import ConfiguracionPage from './pages/ConfiguracionPage'
 import MenuPage from './pages/MenuPage'
 import MesasPage from './pages/MesasPage'
@@ -10,10 +11,12 @@ import ReportesPage from './pages/ReportesPage'
 import PersonalPage from './pages/PersonalPage'
 import LoginPage from './pages/LoginPage'
 import UsuariosPage from './pages/UsuariosPage'
+import VozPage from './pages/VozPage'
 import {
   api,
   EVENTO_SESION_EXPIRADA,
 } from './services/api'
+import { conectarTiempoReal } from './services/tiempoReal'
 import {
   borrarToken,
   guardarToken,
@@ -62,6 +65,13 @@ const modulos = {
     descripcion:
       'Supervisa la preparación y entrega de los pedidos.',
     icono: '♨',
+  },
+  voz: {
+    etiqueta: 'SERVICIO',
+    titulo: 'Pedido por voz',
+    descripcion:
+      'Dicta el pedido y el asistente lo envía a cocina.',
+    icono: '☏',
   },
   reportes: {
     etiqueta: 'ANÁLISIS',
@@ -137,6 +147,44 @@ function App() {
     useState(() => obtenerToken() !== null)
 
   const esAdmin = usuario?.rol === 'ADMIN'
+
+  const [solicitudesPendientes, setSolicitudesPendientes] =
+    useState(0)
+
+  // El administrador ve en el menú cuántas solicitudes de acceso esperan respuesta, y se actualiza en vivo.
+  useEffect(() => {
+    if (!esAdmin) {
+      return undefined
+    }
+
+    let activo = true
+
+    function contar() {
+      api
+        .getSolicitudes('PENDIENTE')
+        .then((lista) => {
+          if (activo) {
+            setSolicitudesPendientes(lista.length)
+          }
+        })
+        .catch(() => {})
+    }
+
+    contar()
+
+    const desconectar = conectarTiempoReal({
+      onCambio: (tablas) => {
+        if (tablas.includes('solicitudes_acceso')) {
+          contar()
+        }
+      },
+    })
+
+    return () => {
+      activo = false
+      desconectar()
+    }
+  }, [esAdmin])
 
   useEffect(() => {
     if (!obtenerToken()) {
@@ -259,7 +307,7 @@ function App() {
 
   function mostrarContenido() {
     if (vistaActual === 'mesas') {
-      return <MesasPage />
+      return <MesasPage esAdmin={esAdmin} />
     }
 
     if (vistaActual === 'clientes') {
@@ -267,7 +315,15 @@ function App() {
     }
 
     if (vistaActual === 'productos') {
-      return <MenuPage />
+      return <MenuPage esAdmin={esAdmin} />
+    }
+
+    if (vistaActual === 'cocina') {
+      return <CocinaPage />
+    }
+
+    if (vistaActual === 'voz') {
+      return <VozPage />
     }
 
     if (vistaActual === 'reportes') {
@@ -275,7 +331,7 @@ function App() {
     }
 
     if (vistaActual === 'configuracion') {
-      return <ConfiguracionPage />
+      return <ConfiguracionPage esAdmin={esAdmin} />
     }
 
     if (vistaActual === 'personal') {
@@ -310,6 +366,7 @@ function App() {
         cerrar={() => setMenuAbierto(false)}
         conectado={conectado}
         esAdmin={esAdmin}
+        solicitudesPendientes={solicitudesPendientes}
       />
 
       <main className="main-content">

@@ -1,8 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
-import CamaraFacial from '../components/CamaraFacial'
+import { useState } from 'react'
+import LoginFacial from '../components/LoginFacial'
+import SolicitarAcceso from '../components/SolicitarAcceso'
 import { api } from '../services/api'
-
-const ESPERA_ENTRE_INTENTOS_MS = 1500
 
 function LoginPage({ onSesion }) {
   const [modo, setModo] = useState('rostro')
@@ -10,37 +9,6 @@ function LoginPage({ onSesion }) {
   const [clave, setClave] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
-
-  const ocupadoRef = useRef(false)
-  const ultimoIntentoRef = useRef(0)
-
-  const intentarRostro = useCallback(
-    async (descriptor) => {
-      const ahora = Date.now()
-      if (
-        ocupadoRef.current ||
-        ahora - ultimoIntentoRef.current < ESPERA_ENTRE_INTENTOS_MS
-      ) {
-        return
-      }
-
-      ocupadoRef.current = true
-      ultimoIntentoRef.current = ahora
-      try {
-        const sesion = await api.faceLogin(descriptor)
-        onSesion(sesion)
-      } catch (err) {
-        setError(
-          err.status === 401
-            ? 'Rostro no reconocido. Vuelve a intentarlo o usa tu contraseña.'
-            : err.message,
-        )
-      } finally {
-        ocupadoRef.current = false
-      }
-    },
-    [onSesion],
-  )
 
   async function enviarClave(evento) {
     evento.preventDefault()
@@ -72,18 +40,28 @@ function LoginPage({ onSesion }) {
           </div>
         </div>
 
-        <h1>Iniciar sesión</h1>
+        <h1>{modo === 'registro' ? 'Solicitar acceso' : 'Iniciar sesión'}</h1>
 
-        {modo === 'rostro' ? (
+        {modo === 'registro' ? (
+          <SolicitarAcceso onVolver={() => cambiarModo('clave')} />
+        ) : modo === 'rostro' ? (
           <>
             <p className="page-subtitle">
-              Mira a la cámara para entrar automáticamente.
+              Sigue las indicaciones frente a la cámara. Si escribes tu usuario, la
+              verificación es más segura.
             </p>
 
-            <CamaraFacial
-              activa
-              onDescriptor={intentarRostro}
-            />
+            <label className="form-field">
+              <span>Usuario (opcional)</span>
+              <input
+                type="text"
+                autoComplete="username"
+                value={usuario}
+                onChange={(e) => setUsuario(e.target.value)}
+              />
+            </label>
+
+            <LoginFacial onSesion={onSesion} username={usuario} />
 
             <button
               type="button"
@@ -146,6 +124,16 @@ function LoginPage({ onSesion }) {
             {error}
           </p>
         )}
+
+        <button
+          type="button"
+          className="button button-outline login-switch"
+          onClick={() => cambiarModo(modo === 'registro' ? 'clave' : 'registro')}
+        >
+          {modo === 'registro'
+            ? 'Ya tengo cuenta: iniciar sesión'
+            : '¿No tienes cuenta? Solicitar acceso'}
+        </button>
       </section>
     </div>
   )

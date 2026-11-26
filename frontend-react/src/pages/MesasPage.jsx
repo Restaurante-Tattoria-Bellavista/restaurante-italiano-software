@@ -41,7 +41,7 @@ function ordenarMesas(lista) {
   )
 }
 
-function MesasPage() {
+function MesasPage({ esAdmin = false }) {
   const [mesas, setMesas] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] =
@@ -322,7 +322,7 @@ function MesasPage() {
         </article>
       </section>
       
-    <MesasPlanoSection mesas={mesas} />
+    <MesasPlanoSection mesas={mesas} esAdmin={esAdmin} />
       <section className="content-card">
         <div className="section-toolbar">
           <div>
@@ -347,13 +347,15 @@ function MesasPage() {
               Actualizar
             </button>
 
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={abrirCreacion}
-            >
-              + Nueva mesa
-            </button>
+            {esAdmin && (
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={abrirCreacion}
+              >
+                + Nueva mesa
+              </button>
+            )}
           </div>
         </div>
 

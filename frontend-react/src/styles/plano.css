@@ -1,0 +1,419 @@
+/* Plano del restaurante con aspecto real: pisos con textura por zona, muros, decoración y mesas con sillas.
+   Todo va bajo .restaurant-map para ganar en especificidad a las reglas anteriores del plano. */
+
+/* Piso común (pasillos): baldosa de piedra clara */
+.restaurant-map {
+  --muro: #3a2d24;
+  --madera-clara: #c99a67;
+  --madera-oscura: #4a2f21;
+  border: 10px solid var(--muro);
+  border-radius: 20px;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 7%) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(0deg, rgb(0 0 0 / 7%) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(135deg, rgb(255 255 255 / 35%), rgb(0 0 0 / 6%)),
+    #d8cfc1;
+  box-shadow:
+    inset 0 0 40px rgb(40 28 18 / 28%),
+    0 12px 30px rgb(40 28 18 / 22%);
+}
+
+.restaurant-map.restaurant-map-editing {
+  border-color: #b7791f;
+  box-shadow:
+    inset 0 0 40px rgb(40 28 18 / 28%),
+    0 0 0 3px rgb(183 121 31 / 25%);
+}
+
+/* ------------------------------------------------------------------ zonas (habitaciones) */
+
+.restaurant-map .map-zone {
+  overflow: hidden;
+  padding: 0;
+  border: 4px solid var(--muro);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 24px rgb(0 0 0 / 28%),
+    0 3px 8px rgb(0 0 0 / 22%);
+  color: #fff;
+}
+
+/* Etiqueta tipo placa */
+.restaurant-map .map-zone > span {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgb(36 26 18 / 82%);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
+  color: #f6e4bf;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
+/* Salón: piso de madera en tablones */
+.restaurant-map .map-zone-main {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 138px, rgb(0 0 0 / 22%) 138px 140px) 0 0 / 100% 56px,
+    repeating-linear-gradient(90deg, transparent 0 69px, rgb(0 0 0 / 22%) 69px 71px) 0 28px / 100% 56px,
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 24%) 0 2px, transparent 2px 28px),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 7%) 0 1px, transparent 1px 5px),
+    linear-gradient(115deg, #d1a171, #bf8c5b 45%, #c99a67);
+}
+
+/* Terraza: losas de piedra con borde de seto */
+.restaurant-map .map-zone-terrace {
+  border-color: #3f6b3a;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 14%) 2px, transparent 2px) 0 0 / 64px 64px,
+    linear-gradient(0deg, rgb(0 0 0 / 14%) 2px, transparent 2px) 0 0 / 64px 64px,
+    radial-gradient(circle at 30% 30%, rgb(255 255 255 / 35%), transparent 60%),
+    #cfc8b8;
+  box-shadow:
+    inset 0 0 0 5px #57914f,
+    inset 0 0 26px rgb(0 0 0 / 22%),
+    0 3px 8px rgb(0 0 0 / 22%);
+}
+
+/* Bar: madera oscura vertical */
+.restaurant-map .map-zone-bar {
+  background:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 35%) 0 2px, transparent 2px 26px),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 5%) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, #5a3a28, #3e2619);
+}
+
+/* VIP: alfombra roja */
+.restaurant-map .map-zone-vip {
+  border-color: #c9a24a;
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 5%) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(-45deg, rgb(0 0 0 / 10%) 0 6px, transparent 6px 12px),
+    radial-gradient(circle at 50% 40%, #8a2e45, #5e1a2c);
+}
+
+/* Recepción: baldosa blanca y negra */
+.restaurant-map .map-zone-reception {
+  background:
+    conic-gradient(#2b2b2b 25%, #f1eee8 0 50%, #2b2b2b 0 75%, #f1eee8 0) 0 0 / 36px 36px;
+}
+
+/* Cocina: acero y baldosa gris */
+.restaurant-map .map-zone-kitchen {
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 16%) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(0deg, rgb(0 0 0 / 16%) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(135deg, #d9dde0, #aeb4b9);
+}
+
+.restaurant-map .map-zone-reception > span,
+.restaurant-map .map-zone-kitchen > span {
+  top: auto;
+  bottom: 6px;
+  left: auto;
+  right: 8px;
+}
+
+/* ------------------------------------------------------------------ decoración */
+
+.restaurant-map .deco {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.restaurant-map .deco-planta {
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 25%));
+}
+
+.restaurant-map .deco-planta-grande {
+  width: 62px;
+  height: 62px;
+}
+
+.restaurant-map .deco-sombrilla {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(#f4e9d2 0 15deg, #c9573b 15deg 30deg);
+  border: 2px solid rgb(0 0 0 / 25%);
+  box-shadow: 0 6px 12px rgb(0 0 0 / 25%);
+  opacity: 0.35;
+}
+
+/* Alfombra central del salón */
+.restaurant-map .deco-alfombra {
+  top: 24%;
+  left: 18%;
+  right: 18%;
+  bottom: 22%;
+  border: 3px solid rgb(120 54 40 / 60%);
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 10%) 0 8px, transparent 8px 16px),
+    rgb(166 80 58 / 28%);
+}
+
+.restaurant-map .deco-alfombra-vip {
+  inset: 22% 12% 12% 12%;
+  border: 3px solid #d9b65d;
+  border-radius: 8px;
+  background: repeating-linear-gradient(45deg, rgb(255 255 255 / 8%) 0 7px, transparent 7px 14px);
+}
+
+/* Barra: estante con botellas, mostrador y bancos */
+.restaurant-map .deco-estante {
+  top: 30%;
+  right: 6%;
+  left: 6%;
+  height: 16%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  border-bottom: 4px solid #2c1b11;
+  background: rgb(0 0 0 / 25%);
+}
+
+.restaurant-map .deco-estante b {
+  display: block;
+  width: 8px;
+  height: 80%;
+  border-radius: 3px 3px 1px 1px;
+  background: #3f8f6a;
+  box-shadow: inset -2px 0 rgb(255 255 255 / 25%);
+}
+
+.restaurant-map .deco-estante b:nth-child(2n) {
+  height: 65%;
+  background: #c98a2b;
+}
+
+.restaurant-map .deco-estante b:nth-child(3n) {
+  background: #8a2e45;
+}
+
+.restaurant-map .deco-mostrador {
+  right: 5%;
+  bottom: 18%;
+  left: 5%;
+  height: 22%;
+  border: 2px solid #20130b;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 25%), transparent 40%),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 18%) 0 2px, transparent 2px 22px),
+    #8a5a3b;
+  box-shadow: 0 6px 10px rgb(0 0 0 / 40%);
+}
+
+.restaurant-map .deco-banco {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #1f120a;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d0694e, #8f3a28);
+  box-shadow: 0 3px 5px rgb(0 0 0 / 40%);
+}
+
+/* Recepción */
+.restaurant-map .deco-recepcion {
+  top: 22%;
+  left: 8%;
+  width: 56%;
+  height: 46%;
+  border: 2px solid #1f120a;
+  border-radius: 8px 8px 20px 8px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 30%), transparent 45%),
+    #7b4f33;
+  box-shadow: 0 6px 10px rgb(0 0 0 / 40%);
+}
+
+/* Cocina: mesón, estufa y ventana de paso */
+.restaurant-map .deco-meson {
+  right: 4%;
+  bottom: 10%;
+  left: 4%;
+  height: 26%;
+  border: 2px solid #6b7276;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #f4f6f7, #bfc6ca);
+  box-shadow: 0 4px 8px rgb(0 0 0 / 30%);
+}
+
+.restaurant-map .deco-estufa {
+  top: 16%;
+  right: 4%;
+  width: 34%;
+  height: 40%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  place-items: center;
+  padding: 3px;
+  border: 2px solid #20262a;
+  border-radius: 4px;
+  background: #3a4247;
+}
+
+.restaurant-map .deco-estufa b {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #111;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff8a3d 20%, #2a2f33 22%);
+}
+
+.restaurant-map .deco-paso {
+  top: 16%;
+  left: 4%;
+  width: 36%;
+  height: 12%;
+  border: 2px solid #6b7276;
+  border-radius: 3px;
+  background: rgb(120 170 200 / 55%);
+}
+
+/* Entrada del restaurante (borde inferior) */
+.restaurant-map::before {
+  content: 'ENTRADA';
+  position: absolute;
+  z-index: 3;
+  bottom: 0;
+  left: 11%;
+  width: 92px;
+  padding: 3px 0 4px;
+  border-radius: 8px 8px 0 0;
+  background: #7b2b2b;
+  box-shadow: 0 -2px 6px rgb(0 0 0 / 30%);
+  color: #f6e4bf;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ mesas */
+
+.restaurant-map .map-table {
+  width: 98px;
+  height: 98px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.restaurant-map .map-table-rect {
+  width: 138px;
+  height: 98px;
+  border-radius: 0;
+}
+
+.restaurant-map .map-table-small {
+  width: 76px;
+  height: 76px;
+  border-radius: 0;
+}
+
+.restaurant-map .map-table-libre,
+.restaurant-map .map-table-reservada,
+.restaurant-map .map-table-ocupada,
+.restaurant-map .map-table-fuera_de_servicio {
+  background: transparent;
+}
+
+.restaurant-map .mesa-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 5px rgb(0 0 0 / 35%));
+  transition: filter 160ms ease;
+}
+
+.restaurant-map .map-table:hover .mesa-svg {
+  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 45%)) brightness(1.06);
+}
+
+.restaurant-map .map-table-selected {
+  box-shadow: none;
+}
+
+.restaurant-map .map-table-selected .mesa-svg {
+  filter:
+    drop-shadow(0 0 2px #fff5cc)
+    drop-shadow(0 0 7px #f8c453)
+    drop-shadow(0 0 14px rgb(248 196 83 / 80%));
+}
+
+.restaurant-map .map-table-dragging {
+  box-shadow: none;
+}
+
+.restaurant-map .map-table-dragging .mesa-svg {
+  filter:
+    drop-shadow(0 12px 12px rgb(0 0 0 / 50%))
+    drop-shadow(0 0 8px #f8c453);
+}
+
+.restaurant-map .map-table-inactive {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+
+.restaurant-map .map-table .mesa-guardando {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: rgb(36 26 18 / 88%);
+  color: #f6e4bf;
+  font-size: 0.6rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .restaurant-map {
+    border-width: 7px;
+  }
+
+  .restaurant-map .map-table {
+    width: 74px;
+    height: 74px;
+  }
+
+  .restaurant-map .map-table-rect {
+    width: 104px;
+  }
+
+  .restaurant-map .map-table-small {
+    width: 58px;
+    height: 58px;
+  }
+
+  .restaurant-map .map-zone > span {
+    font-size: 0.5rem;
+  }
+
+  .restaurant-map .deco-planta {
+    width: 34px;
+    height: 34px;
+  }
+
+  .restaurant-map .deco-planta-grande {
+    width: 44px;
+    height: 44px;
+  }
+}

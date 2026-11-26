@@ -79,7 +79,7 @@ function crearLayoutInicial(mesa, indice) {
   }
 }
 
-function MesasPlanoSection({ mesas = [] }) {
+function MesasPlanoSection({ mesas = [], esAdmin = false }) {
   const [layouts, setLayouts] = useState({})
   const [
     mesaSeleccionadaId,
@@ -383,20 +383,22 @@ function MesasPlanoSection({ mesas = [] }) {
             ↻ Recargar plano
           </button>
 
-          <button
-            type="button"
-            className={
-              modoEdicion
-                ? 'button button-primary'
-                : 'button button-outline'
-            }
-            disabled={guardandoId !== null}
-            onClick={alternarModoEdicion}
-          >
-            {modoEdicion
-              ? 'Finalizar edición'
-              : 'Editar posiciones'}
-          </button>
+          {esAdmin && (
+            <button
+              type="button"
+              className={
+                modoEdicion
+                  ? 'button button-primary'
+                  : 'button button-outline'
+              }
+              disabled={guardandoId !== null}
+              onClick={alternarModoEdicion}
+            >
+              {modoEdicion
+                ? 'Finalizar edición'
+                : 'Editar posiciones'}
+            </button>
+          )}
         </div>
       </div>
 

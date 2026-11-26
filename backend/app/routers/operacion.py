@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, insert, update, delete, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from app.core.dependencies import require_admin
 from app.db.session import get_db
 from app.models.catalogo import mesas, productos
 from app.models.operacion import pedidos, detalle_pedido, restaurante_config
@@ -161,6 +162,25 @@ def cocina(db:Session=Depends(get_db)):
     return [dict(r) for r in db.execute(select(pedidos).where(pedidos.c.estado.in_(
         ('EN_PREPARACION','LISTO'))).order_by(pedidos.c.created_at)).mappings().all()]
 
+@router.get('/cocina/comandas')
+def comandas_cocina(db:Session=Depends(get_db)):
+    """Comandas para la pantalla de cocina: pedidos con productos, ya con el numero de mesa.
+    Incluye los ABIERTOS (recien tomados) y omite los que aun no tienen productos."""
+    filas = db.execute(select(pedidos, mesas.c.numero.label('mesa_numero')).join(
+        mesas, mesas.c.id == pedidos.c.mesa_id).where(pedidos.c.estado.in_(
+        ('ABIERTO','EN_PREPARACION','LISTO'))).order_by(pedidos.c.created_at, pedidos.c.id)).mappings().all()
+    items = {r['id']: [] for r in filas}
+    if items:
+        detalles = db.execute(select(detalle_pedido.c.id, detalle_pedido.c.pedido_id, detalle_pedido.c.producto_id,
+            productos.c.nombre, productos.c.categoria, detalle_pedido.c.cantidad, detalle_pedido.c.observacion).join(
+            productos, productos.c.id == detalle_pedido.c.producto_id).where(
+            detalle_pedido.c.pedido_id.in_(list(items))).order_by(detalle_pedido.c.id)).mappings().all()
+        for d in detalles:
+            items[d['pedido_id']].append({k: d[k] for k in ('id','producto_id','nombre','categoria','cantidad','observacion')})
+    return [{'id': r['id'], 'mesa_id': r['mesa_id'], 'mesa_numero': r['mesa_numero'], 'estado': r['estado'],
+        'created_at': r['created_at'], 'updated_at': r['updated_at'], 'items': items[r['id']]}
+        for r in filas if items[r['id']]]
+
 @router.get('/reportes/dashboard')
 def dashboard(db:Session=Depends(get_db)):
     counts = db.execute(select(pedidos.c.estado,func.count().label('cantidad')).group_by(pedidos.c.estado)).all()
@@ -183,7 +203,7 @@ def ver_configuracion(db:Session=Depends(get_db)):
         return {'id':0,'nombre':'Trattoria Bellavista','especialidad':'Cucina Italiana','moneda':'COP'}
     return dict(result)
 
-@router.patch('/configuracion',response_model=ConfigRead)
+@router.patch('/configuracion',response_model=ConfigRead,dependencies=[Depends(require_admin)])
 def editar_configuracion(payload:ConfigUpdate,db:Session=Depends(get_db)):
     changes = payload.model_dump(exclude_unset=True)
     mandatory = {'nombre','especialidad','moneda'}

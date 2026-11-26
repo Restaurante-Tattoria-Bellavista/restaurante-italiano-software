@@ -20,8 +20,12 @@ from app.routers.operacion import router as operacion_router
 from app.routers.reservas import router as reservas_router
 from app.routers.health import router as health_router
 from app.routers.catalogo import router as catalogo_router
+from app.routers.solicitudes import admin_router as solicitudes_admin_router
+from app.routers.solicitudes import publico_router as solicitudes_publico_router
 from app.routers.tiempo_real import router as tiempo_real_router
 from app.routers.ubicaciones import router as ubicaciones_router
+from app.routers.voz import dispositivo_router as voz_dispositivo_router
+from app.routers.voz import router as voz_router
 from app.core.realtime import hub
 import app.db.eventos  # noqa: F401  registra los listeners de escritura
 
@@ -46,12 +50,16 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(metricas_router)
     app.include_router(auth_router)
+    app.include_router(solicitudes_publico_router)
     app.include_router(tiempo_real_router)
     app.include_router(ubicaciones_router)
+    app.include_router(voz_dispositivo_router)
     app.include_router(usuarios_router, dependencies=proteccion)
+    app.include_router(solicitudes_admin_router, dependencies=proteccion)
     app.include_router(operacion_router, dependencies=proteccion)
     app.include_router(reservas_router, dependencies=proteccion)
     app.include_router(catalogo_router, dependencies=proteccion)
+    app.include_router(voz_router, dependencies=proteccion)
     return app
 
 

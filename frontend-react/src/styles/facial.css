@@ -1,0 +1,259 @@
+/* Cámara facial: visor con guía en óvalo y recuadro que sigue al rostro detectado. */
+.camara-facial {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* El visor se espeja como un selfie; el recuadro va dentro, así se espeja igual que el video. */
+.camara-facial-visor {
+  position: relative;
+  width: min(100%, 480px);
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 3px solid #d8cfc3;
+  border-radius: 18px;
+  background: #101514;
+  box-shadow: 0 8px 24px rgb(20 30 26 / 18%);
+  transform: scaleX(-1);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.camara-facial-visor.ok {
+  border-color: #2f9e7e;
+  box-shadow: 0 0 0 4px rgb(47 158 126 / 22%), 0 8px 24px rgb(20 30 26 / 18%);
+}
+
+.camara-facial-visor.aviso {
+  border-color: #e3a92c;
+  box-shadow: 0 0 0 4px rgb(227 169 44 / 22%), 0 8px 24px rgb(20 30 26 / 18%);
+}
+
+.camara-facial-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Óvalo de referencia: dónde conviene poner la cara. El resto se oscurece. */
+.camara-facial-guia {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 42%;
+  height: 78%;
+  border: 2px dashed rgb(255 255 255 / 70%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgb(8 18 14 / 38%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.camara-facial-caja {
+  position: absolute;
+  border: 3px solid #e3a92c;
+  border-radius: 12px;
+  box-shadow: 0 0 14px rgb(227 169 44 / 55%);
+  transition: left 120ms linear, top 120ms linear, width 120ms linear, height 120ms linear,
+    border-color 160ms ease;
+  pointer-events: none;
+}
+
+.camara-facial-caja.ok {
+  border-color: #38d39f;
+  box-shadow: 0 0 14px rgb(56 211 159 / 60%);
+}
+
+.camara-facial-estado {
+  min-height: 1.4em;
+  margin: 0;
+  color: #3d3a35;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ ventana de registro */
+
+.registro-modal {
+  --reserva: 330px;
+  width: min(1000px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.registro-modal .dialog-header {
+  padding: 18px 24px 14px;
+}
+
+.registro-modal .dialog-header h2 {
+  margin: 2px 0 0;
+  font-size: 1.55rem;
+}
+
+.registro-modal-cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+  gap: 22px;
+  padding: 18px 24px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* En la ventana el visor crece hasta el alto disponible sin obligar a usar el scroll. */
+.registro-modal .camara-facial-visor {
+  width: min(100%, calc((100vh - var(--reserva)) * var(--relacion, 1.333)));
+}
+
+.registro-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.registro-actual {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #cfe3da;
+  border-radius: 16px;
+  background: #eef7f2;
+}
+
+.registro-actual.completo {
+  background: #e7f3e9;
+  border-color: #b5d9bc;
+}
+
+.registro-flecha {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #17664f;
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.registro-actual strong {
+  display: block;
+  color: #0f3e33;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.registro-actual p {
+  margin: 4px 0 0;
+  color: #24352e;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.registro-pasos {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.registro-pasos li {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 1px solid #ddd3c6;
+  border-radius: 12px;
+  background: #fbf8f3;
+  color: #7d756b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.registro-pasos li span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e8e1d6;
+  font-size: 0.95rem;
+}
+
+.registro-pasos li.actual {
+  border-color: #17664f;
+  background: #eef7f2;
+  color: #0f3e33;
+}
+
+.registro-pasos li.actual span {
+  background: #17664f;
+  color: #fff;
+}
+
+.registro-pasos li.hecho {
+  border-color: #2e7d32;
+  background: #e7f3e9;
+  color: #2e7d32;
+}
+
+.registro-pasos li.hecho span {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.registro-consejos {
+  margin: 0;
+  padding: 12px 16px 12px 32px;
+  border-radius: 14px;
+  background: #fbf6ea;
+  color: #5a4a2c;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.registro-medida {
+  margin: 0;
+  color: #8a8379;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.registro-modal-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border, #ded5c8);
+  background: #fffdf9;
+}
+
+@media (max-width: 860px) {
+  .registro-modal {
+    --reserva: 520px;
+  }
+
+  .registro-modal-cuerpo {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .registro-pasos li {
+    font-size: 0.64rem;
+  }
+}

@@ -1,16 +1,16 @@
-"""Utilidades de seguridad: hash de contrasenas y tokens de sesion firmados.
-
-Usa solo la libreria estandar de Python para no agregar dependencias.
-"""
-import base64
+"""Utilidades de seguridad: hash de contrasenas (PBKDF2, libreria estandar) y tokens de sesion JWT (PyJWT)."""
 import hashlib
 import hmac
-import json
 import os
+import secrets
 import time
+
+import jwt
 
 PBKDF2_ITERATIONS = 310_000
 ALGORITMO_HASH = "pbkdf2_sha256"
+ALGORITMO_JWT = "HS256"
+EMISOR_JWT = "trattoria-bellavista"
 
 
 def hash_password(password: str) -> str:
@@ -41,30 +41,36 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
 HASH_FICTICIO = hash_password("contrasena-ficticia-no-utilizable")
 
 
-def _b64encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _b64decode(data: str) -> bytes:
-    return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
-
-
 def create_token(usuario_id: int, rol: str, secret: str, ttl_seconds: int) -> str:
-    payload = {"sub": usuario_id, "rol": rol, "exp": int(time.time()) + ttl_seconds}
-    cuerpo = _b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    firma = hmac.new(secret.encode("utf-8"), cuerpo.encode("ascii"), hashlib.sha256).digest()
-    return f"{cuerpo}.{_b64encode(firma)}"
+    """JWT firmado con HS256 (RFC 7519): header.payload.firma, decodificable en jwt.io.
+
+    Claims: sub (id del usuario, como texto segun el RFC), rol, iss (emisor), iat, exp y jti (id unico del token).
+    """
+    ahora = int(time.time())
+    payload = {
+        "sub": str(usuario_id),
+        "rol": rol,
+        "iss": EMISOR_JWT,
+        "iat": ahora,
+        "exp": ahora + ttl_seconds,
+        "jti": secrets.token_hex(8),
+    }
+    return jwt.encode(payload, secret, algorithm=ALGORITMO_JWT)
 
 
 def decode_token(token: str, secret: str) -> dict | None:
+    """Devuelve los claims si el token es valido y vigente; None en cualquier otro caso.
+
+    Se fija el algoritmo (HS256) para que un token con "alg": "none" u otro algoritmo no se acepte, y se exigen
+    exp, sub e iss: un token sin vencimiento no es valido.
+    """
     try:
-        cuerpo, firma_recibida = token.split(".")
-        firma_esperada = hmac.new(secret.encode("utf-8"), cuerpo.encode("ascii"), hashlib.sha256).digest()
-        if not hmac.compare_digest(_b64encode(firma_esperada), firma_recibida):
-            return None
-        payload = json.loads(_b64decode(cuerpo))
-        if int(payload.get("exp", 0)) < time.time():
-            return None
-        return payload
-    except (ValueError, TypeError, json.JSONDecodeError):
+        return jwt.decode(
+            token,
+            secret,
+            algorithms=[ALGORITMO_JWT],
+            issuer=EMISOR_JWT,
+            options={"require": ["exp", "sub", "iss"]},
+        )
+    except jwt.PyJWTError:
         return None
