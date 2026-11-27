@@ -12,6 +12,7 @@ from app.core.errors import (
 )
 from app.routers.health import router as health_router
 from app.routers.catalogo import router as catalogo_router
+from app.routers.voz import router as voz_router
 
 
 def create_app() -> FastAPI:
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(operacion_router)
     app.include_router(reservas_router)
     app.include_router(catalogo_router)
+    app.include_router(voz_router)
     return app
 
 

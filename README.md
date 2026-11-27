@@ -271,3 +271,64 @@ Las imágenes que acompañan este README provienen de capturas del historial de 
 ---
 
 *Documentación elaborada a partir del código revisado en `dev`, las respuestas observadas durante la certificación local y el historial de PR. Una funcionalidad descrita en código no sustituye su prueba E2E.*
+
+
+## 12. Pedidos por voz, tablero de cocina, Grafana y terminal ESP32 (27/11/2026)
+
+### 12.1 Qué se agregó
+
+| Componente | Qué hace | Dónde está |
+|---|---|---|
+| Interpretación de pedidos | Entiende lo dictado contra el menú y las mesas (Gemini; si falla, intérprete local por reglas) | `backend/app/services/voz_service.py` |
+| API de voz | `POST /api/voz/audio` (ESP32, exige `X-Device-Key`), `POST /api/voz/audio-web` (página web), `POST /api/voz/interpretar`, `POST /api/voz/confirmar`, `DELETE /api/voz/sesion/{id}`, `GET /api/voz/estado` | `backend/app/routers/voz.py` |
+| Tablero de cocina | Muestra los pedidos **Nuevos / En preparación / Listos** con sus productos, se actualiza cada 4 s y marca «NUEVO» los que acaban de llegar | `frontend-react/src/pages/CocinaPage.jsx`, `GET /api/v1/cocina` |
+| Pedido por voz (web) | Sube un audio o graba con el micrófono del navegador, lo convierte a WAV 16 kHz y lo envía; muestra lo entendido y permite confirmar | `frontend-react/src/pages/VozPage.jsx`, `services/audio.js` |
+| Grafana | Dashboard «Trattoria Bellavista - Operacion» sobre Postgres con un rol de solo lectura (`grafana_ro`) | `docker/grafana/`, `docker/postgres/03-grafana-ro.sh` |
+| Terminal de voz ESP32 | Botón + micrófono INMP441; graba, envía el WAV al backend y escribe la respuesta por serie | `firmware/voice-terminal/` |
+
+Flujo: `ESP32 / página web → audio WAV → backend → Gemini → borrador del pedido → «eso es todo» o botón Confirmar → pedido ABIERTO → tablero de cocina`.
+
+Variables nuevas en `.env` (plantilla en `.env.docker.example`): `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_DB_PASSWORD`, `GRAFANA_PORT`, `BACKEND_PORT`, `VOZ_DEVICE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`. Puertos: frontend 8080, API 8001, Grafana 3000.
+
+### 12.2 Bitácora de pruebas con el ESP32 — resultado: el micrófono NO llegó a funcionar
+
+El software (botón → WiFi → servidor → Gemini → pedido) quedó probado. **No se logró capturar voz** con el INMP441: la lectura I2S llegó plana. Lo que se hizo, en orden:
+
+| # | Prueba / cambio | Resultado |
+|---|---|---|
+| 1 | Detectar la placa por USB | Sin puerto COM; el CH340 figuraba como «Unknown». Cambiando cable/puerto apareció en **COM3** |
+| 2 | Compilar y subir el firmware (PlatformIO, `esp32dev`) | Correcto (≈980 KB, flash 31 %) |
+| 3 | Conectar a WiFi | La plantilla traía `tu-wifi`. La red 5 GHz no sirve (el ESP32 solo usa **2.4 GHz**); se cambió de red y de IP del PC (`API_BASE`) |
+| 4 | Llegar al backend desde la red | Puerto 8000 ocupado por el stack del borrador → API publicada en **8001**; el firewall de Windows debe permitir ese puerto |
+| 5 | Audio sintético desde el PC a `/api/voz/audio` | 401 con clave mala, 200 con la correcta; Gemini responde «no se escuchó nada» (era un tono) |
+| 6 | Pines del micrófono | El cableado real era SCK=D18, WS=D19, SD=D23; el firmware esperaba 27/33/32 → se cambió `config.h` |
+| 7 | Botón (GPIO 4) | Detectado: el firmware entra en «Escuchando» y envía |
+| 8 | Canal I2S derecho | Ceros exactos (`pico=1`) |
+| 9 | Canal I2S izquierdo (L/R a GND) | Valor constante ≈ -430…-570 (pico crudo = desfase): sin variación con la voz |
+| 10 | Intercambiar SCK y WS | Igual de plano (DC=246) |
+| 11 | Tras recablear en la protoboard | Ceros exactos en ambos canales |
+| 12 | Diagnóstico en el firmware (`[senal]` y `[mic]` cada 3 s) | **WiFi RSSI -46 dBm (excelente)**; `[mic] rango=0 raw0=0x00000000 → SIN SENAL` |
+
+**Conclusión:** la red, el botón, el servidor y Gemini funcionan; el pin SD del INMP441 no entrega datos. Causas probables, por orden: pines del módulo sin soldar o sin contacto en la protoboard, cable SD/alimentación (VDD a **3V3**, nunca 5 V), L/R flotante, o módulo dañado.
+Nota: el `RSSI` se convierte a distancia con un modelo log-distancia (≈1 m con -46 dBm); es una estimación, no una medida.
+
+**Siguientes pasos:** soldar los pines, medir 3.3 V entre VDD y GND, probar otro INMP441 o un micrófono con salida analógica (`MIC_I2S 0`, GPIO 34) y volver a leer el monitor serie (`python -m platformio device monitor`).
+
+### 12.3 Incidencias de despliegue de esta sesión
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| `failed to read dockerfile: invalid file request Dockerfile` | Docker Desktop no puede leer archivos de OneDrive (*Files On-Demand*) | Construir desde una copia fuera de OneDrive (`C:\dev\trattoria`) |
+| Backend `unhealthy`, `/health/db` 503 | Volumen Postgres de un despliegue anterior con otra contraseña | `docker compose down -v` (borra datos) y recrear |
+| Puerto 8080 ocupado | Contenedor `caddy` de otro despliegue | Detenerlo |
+| Contraseña rechazada en la URI | Caracteres especiales en la clave heredada del borrador | Contraseña alfanumérica nueva |
+| `401 Clave de dispositivo invalida` desde la web | La clave del ESP32 no puede ir en el navegador | Endpoint separado `/api/voz/audio-web` sin clave |
+| DNS intermitente al construir (`no such host`) | Red momentánea | Reintentar |
+
+### 12.4 Pruebas de extremo a extremo realizadas
+
+- `POST /api/voz/interpretar` con «mesa 3 quiero dos lasagna de la casa» → borrador correcto (Gemini).
+- Voz sintetizada (Windows, es-ES) por `/api/voz/audio-web` → transcripción y borrador; Gemini pidió aclarar «bruschetta» en vez de inventar el plato.
+- `POST /api/voz/confirmar` dos veces sobre la misma mesa → un solo pedido, cantidades sumadas (3 lasagnas = 102 000).
+- `GET /api/v1/cocina` → el pedido aparece con mesa, hora y productos.
+- Grafana: datasource `Database Connection OK` y dashboard provisionado.

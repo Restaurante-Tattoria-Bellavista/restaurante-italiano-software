@@ -179,4 +179,71 @@ export const api = {
       body: JSON.stringify(datos),
     })
   },
+
+  getCocina() {
+    return request('/api/v1/cocina')
+  },
+
+  cambiarEstadoPedido(pedidoId, estado) {
+    return request(
+      `/api/v1/pedidos/${pedidoId}/estado`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ estado }),
+      },
+    )
+  },
+
+  // Audio WAV crudo (el procesamiento con Gemini puede tardar): sin el limite de 5 s.
+  async enviarAudioVoz(wav, sesion = 'web') {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      60000,
+    )
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/voz/audio-web?sesion=${encodeURIComponent(sesion)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'audio/wav' },
+          body: wav,
+          signal: controller.signal,
+        },
+      )
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error?.message ||
+            data?.detail ||
+            `El servidor respondió con estado ${response.status}.`,
+        )
+      }
+
+      return data
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('El procesamiento del audio tardó demasiado.')
+      }
+      throw error
+    } finally {
+      window.clearTimeout(timeout)
+    }
+  },
+
+  confirmarPedidoVoz(borrador) {
+    return request('/api/voz/confirmar', {
+      method: 'POST',
+      body: JSON.stringify(borrador),
+    })
+  },
+
+  reiniciarSesionVoz(sesion = 'web') {
+    return request(
+      `/api/voz/sesion/${encodeURIComponent(sesion)}`,
+      { method: 'DELETE' },
+    )
+  },
 }

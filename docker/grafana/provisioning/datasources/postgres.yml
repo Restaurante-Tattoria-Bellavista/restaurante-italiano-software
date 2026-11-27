@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+  - name: Restaurante
+    uid: restaurante-pg
+    type: postgres
+    url: db:5432
+    user: grafana_ro
+    isDefault: true
+    jsonData:
+      database: restaurant
+      sslmode: disable
+      postgresVersion: 1700
+    secureJsonData:
+      password: ${GRAFANA_DB_PASSWORD}

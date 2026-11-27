@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import ConnectionBanner from './components/ConnectionBanner'
 import Sidebar from './components/Sidebar'
 import ClientesPage from './pages/ClientesPage'
+import CocinaPage from './pages/CocinaPage'
+import VozPage from './pages/VozPage'
 import ConfiguracionPage from './pages/ConfiguracionPage'
 import MenuPage from './pages/MenuPage'
 import MesasPage from './pages/MesasPage'
@@ -51,6 +53,13 @@ const modulos = {
     descripcion:
       'Supervisa la preparación y entrega de los pedidos.',
     icono: '♨',
+  },
+  voz: {
+    etiqueta: 'SERVICIO',
+    titulo: 'Pedido por voz',
+    descripcion:
+      'Sube o graba un audio: se interpreta y el pedido llega al tablero de cocina.',
+    icono: '🎙',
   },
   reportes: {
     etiqueta: 'ANÁLISIS',
@@ -172,6 +181,18 @@ function App() {
 
     if (vistaActual === 'productos') {
       return <MenuPage />
+    }
+
+    if (vistaActual === 'cocina') {
+      return <CocinaPage />
+    }
+
+    if (vistaActual === 'voz') {
+      return (
+        <VozPage
+          irACocina={() => cambiarVista('cocina')}
+        />
+      )
     }
 
     if (vistaActual === 'reportes') {

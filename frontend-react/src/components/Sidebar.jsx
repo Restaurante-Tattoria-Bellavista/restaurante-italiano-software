@@ -30,6 +30,11 @@ const opcionesNavegacion = [
     icono: '♨',
   },
   {
+    id: 'voz',
+    nombre: 'Pedido por voz',
+    icono: '🎙',
+  },
+  {
     id: 'reportes',
     nombre: 'Reportes',
     icono: '▥',
