@@ -12,7 +12,7 @@ Sistema web para gestionar un restaurante italiano (mesas, menú, clientes, rese
 
 | Pieza | Tecnología | Puerto local | Para qué |
 |---|---|---|---|
-| Frontend | React + Vite, servido por Nginx | 8080 | Interfaz de gerente/cocina; Nginx también hace de proxy hacia la API |
+| Frontend | React + Vite, servido por Nginx detrás de Caddy | https://localhost | Interfaz de gerente/cocina; Nginx también hace de proxy hacia la API |
 | Backend | FastAPI (Python), SQLAlchemy | 8001 | API REST `/api/v1/...` y `/api/voz/...` |
 | Base de datos | PostgreSQL 17 | interno | Mesas, productos, pedidos, etc. |
 | Grafana | Grafana 11.3 | 3000 | Dashboard operativo leyendo Postgres (rol solo lectura) |
@@ -59,6 +59,8 @@ ABIERTO ──▶ EN_PREPARACION ──▶ LISTO ──▶ ENTREGADO ──▶ P
 | En preparación | EN_PREPARACION | Marcar listo |
 | Listos para entregar | LISTO | Entregado |
 
+Todas las rutas exigen sesión (login por contraseña o rostro, del PR de autenticación); el ESP32 es la excepción y usa solo su clave de dispositivo.
+
 Un pedido por voz nace `ABIERTO`, aparece en **Nuevos** con la etiqueta roja **NUEVO** unos segundos. Reglas de la BD: no se puede enviar a preparación un pedido sin productos; las líneas solo se editan mientras el pedido está `ABIERTO`.
 
 ## 5. Base de datos (tablas principales)
@@ -95,19 +97,19 @@ Un pedido por voz nace `ABIERTO`, aparece en **Nuevos** con la etiqueta roja **N
 ## 8. Guion de demostración (5–7 min)
 
 1. `docker compose ps` → los 4 servicios *healthy*.
-2. **Frontend** `http://localhost:8080` → mesas, menú, reportes.
+2. **Frontend** `https://localhost` (iniciar sesión con el usuario admin) → mesas, menú, reportes.
 3. **Pedido por voz** (menú lateral) → subir/grabar «mesa tres, dos lasagna de la casa» → *Procesar* → mostrar lo entendido → *Confirmar y enviar a cocina*.
 4. **Cocina** → aparece el pedido en *Nuevos* con **NUEVO** → *Empezar a preparar* → *Listo* → *Entregado*.
 5. **Grafana** `http://localhost:3000` (admin) → dashboard «Operacion»: pedidos por hora, estados, top de productos.
 6. **ESP32** (si se muestra): monitor serie con `[senal]` en verde (RSSI), explicar el estado del micrófono con honestidad.
-7. (Opcional) `http://localhost:8080/docs` para mostrar la API.
+7. (Opcional) `https://localhost/docs` para mostrar la API.
 
 ## 9. Preguntas probables y respuestas
 
 - **¿Por qué una IA y no solo reglas?** Las reglas fallan con acentos, sinónimos y ruido; Gemini transcribe y entiende. Las reglas quedan de respaldo.
 - **¿Qué pasa si Gemini alucina un plato?** No se acepta: el backend solo admite productos del menú y pregunta «¿quisiste decir…?».
 - **¿Y si falla internet o la IA?** Cae al intérprete por reglas para texto; para audio se pide repetir (no hay transcripción local).
-- **¿Es seguro?** El endpoint del ESP32 exige clave de dispositivo (comparación en tiempo constante); Grafana usa un rol de solo lectura; las claves van en `.env`, que no se sube a git. La web de voz aún no tiene login (el PR de autenticación lo cubre).
+- **¿Es seguro?** El endpoint del ESP32 exige clave de dispositivo (comparación en tiempo constante); Grafana usa un rol de solo lectura; las claves van en `.env`, que no se sube a git. Las rutas de voz de la web exigen sesión (JWT); el ESP32 entra solo por `/api/voz/audio` con su clave.
 - **¿Por qué el pedido queda ABIERTO y no EN_PREPARACION?** Para que cocina lo vea como *nuevo* y decida cuándo empezar; así el flujo es el mismo que un pedido manual.
 - **¿Por qué no funcionó el micrófono?** Lectura I2S plana; se descartó software (canales, pines, SCK/WS) y quedó como fallo de hardware; hay diagnóstico integrado.
 - **¿Escala?** El borrador de sesión vive en memoria de un solo proceso: para varias réplicas habría que moverlo a Redis o a la base. Anotado como mejora.

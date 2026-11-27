@@ -327,7 +327,9 @@ Roles: **ADMIN** (acceso total y gestión de usuarios) y **PERSONAL** (operació
 
 Flujo: `ESP32 / página web → audio WAV → backend → Gemini → borrador del pedido → «eso es todo» o botón Confirmar → pedido ABIERTO → tablero de cocina`.
 
-Variables nuevas en `.env` (plantilla en `.env.docker.example`): `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_DB_PASSWORD`, `GRAFANA_PORT`, `BACKEND_PORT`, `VOZ_DEVICE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`. Puertos: frontend 8080, API 8001, Grafana 3000.
+Variables nuevas en `.env` (plantilla en `.env.docker.example`): `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_DB_PASSWORD`, `GRAFANA_PORT`, `BACKEND_PORT`, `VOZ_DEVICE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`. Puertos: aplicación **https://localhost** (Caddy; HTTP en 8080 redirige a HTTPS con certificado local, el navegador avisará una vez), API 8001 (solo para el ESP32), Grafana 3000.
+
+**Acceso tras integrar la autenticación de `dev`:** todas las rutas exigen login. La página de voz usa la sesión del usuario (`/api/voz/audio-web`, `/interpretar`, `/confirmar`); el ESP32 no tiene usuario y usa solo `POST /api/voz/audio` con la cabecera `X-Device-Key` (si `VOZ_DEVICE_KEY` no está definida, la ruta responde 503). Variables nuevas de `dev`: `AUTH_SECRET`, `GATEWAY_TOKEN`, `SITE_ADDRESS`, `HTTP_PORT`, `HTTPS_PORT`. Primer usuario: `docker compose exec -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD=<clave> backend python -m app.scripts.crear_admin`.
 
 ### 12.2 Bitácora de pruebas con el ESP32 — resultado: el micrófono NO llegó a funcionar
 
@@ -361,12 +363,13 @@ Nota: el `RSSI` se convierte a distancia con un modelo log-distancia (≈1 m con
 | Backend `unhealthy`, `/health/db` 503 | Volumen Postgres de un despliegue anterior con otra contraseña | `docker compose down -v` (borra datos) y recrear |
 | Puerto 8080 ocupado | Contenedor `caddy` de otro despliegue | Detenerlo |
 | Contraseña rechazada en la URI | Caracteres especiales en la clave heredada del borrador | Contraseña alfanumérica nueva |
-| `401 Clave de dispositivo invalida` desde la web | La clave del ESP32 no puede ir en el navegador | Endpoint separado `/api/voz/audio-web` sin clave |
+| `401 Clave de dispositivo invalida` desde la web | La clave del ESP32 no puede ir en el navegador | Endpoint separado `/api/voz/audio-web`, que usa la sesión del usuario |
 | DNS intermitente al construir (`no such host`) | Red momentánea | Reintentar |
 
 ### 12.4 Pruebas de extremo a extremo realizadas
 
 - `POST /api/voz/interpretar` con «mesa 3 quiero dos lasagna de la casa» → borrador correcto (Gemini).
+- Con la autenticación de `dev`: sin sesión, cocina y audio-web responden 401; con token funcionan; el ESP32 con clave correcta responde, con clave mala da 401 y la API general por el puerto 8001 sigue exigiendo token.
 - Voz sintetizada (Windows, es-ES) por `/api/voz/audio-web` → transcripción y borrador; Gemini pidió aclarar «bruschetta» en vez de inventar el plato.
 - `POST /api/voz/confirmar` dos veces sobre la misma mesa → un solo pedido, cantidades sumadas (3 lasagnas = 102 000).
 - `GET /api/v1/cocina` → el pedido aparece con mesa, hora y productos.
