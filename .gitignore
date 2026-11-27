@@ -151,6 +151,8 @@ activemq-data/
 
 # Environments
 .env
+# Secret real de Kubernetes (la plantilla es k8s/secret.example.yaml)
+k8s/secret.yaml
 .envrc
 .venv
 env/
@@ -218,3 +220,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Artefactos de compilacion del firmware (PlatformIO)
+.pio/

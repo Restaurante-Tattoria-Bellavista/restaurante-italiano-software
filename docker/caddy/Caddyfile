@@ -1,0 +1,8 @@
+# SITE_ADDRESS:
+#  - localhost (por defecto): HTTPS local con certificado interno de Caddy.
+#  - Un dominio publico (por ejemplo trattoria-bellavista.eastus2.cloudapp.azure.com):
+#    Caddy obtiene el certificado de Let's Encrypt automaticamente. Requiere abrir los puertos 80 y 443.
+{$SITE_ADDRESS:localhost} {
+    encode gzip
+    reverse_proxy frontend:80
+}

@@ -25,6 +25,11 @@ const opcionesNavegacion = [
     icono: '♙',
   },
   {
+    id: 'personal',
+    nombre: 'Personal',
+    icono: '◎',
+  },
+  {
     id: 'cocina',
     nombre: 'Cocina',
     icono: '♨',
@@ -46,13 +51,24 @@ const opcionesNavegacion = [
   },
 ]
 
+const opcionAdmin = {
+  id: 'usuarios',
+  nombre: 'Usuarios',
+  icono: '◉',
+}
+
 function Sidebar({
   vistaActual,
   cambiarVista,
   abierto,
   cerrar,
   conectado,
+  esAdmin = false,
 }) {
+  const opciones = esAdmin
+    ? [...opcionesNavegacion, opcionAdmin]
+    : opcionesNavegacion
+
   function seleccionarVista(vista) {
     cambiarVista(vista)
     cerrar()
@@ -87,7 +103,7 @@ function Sidebar({
           className="main-navigation"
           aria-label="Navegación principal"
         >
-          {opcionesNavegacion.map((opcion) => (
+          {opciones.map((opcion) => (
             <button
               key={opcion.id}
               type="button"

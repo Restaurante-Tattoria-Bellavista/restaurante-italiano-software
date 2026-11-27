@@ -1,5 +1,9 @@
+import { borrarToken, obtenerToken } from './session'
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || ''
+
+export const EVENTO_SESION_EXPIRADA = 'sesion-expirada'
 
 async function request(path, options = {}) {
   const controller = new AbortController()
@@ -8,6 +12,8 @@ async function request(path, options = {}) {
     controller.abort()
   }, 5000)
 
+  const token = obtenerToken()
+
   try {
     const response = await fetch(
       `${API_BASE_URL}${path}`,
@@ -15,6 +21,9 @@ async function request(path, options = {}) {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token
+            ? { Authorization: `Bearer ${token}` }
+            : {}),
           ...options.headers,
         },
         signal: controller.signal,
@@ -23,22 +32,40 @@ async function request(path, options = {}) {
 
     if (!response.ok) {
       let mensajeServidor = ''
+      let detalles = []
 
       try {
         const errorData = await response.json()
 
         mensajeServidor =
           errorData?.detail ||
+          errorData?.error?.message ||
           errorData?.message ||
           ''
+        detalles = errorData?.error?.details || []
       } catch {
         mensajeServidor = ''
       }
 
-      throw new Error(
+      // Un 401 con token guardado significa que la sesión venció o fue revocada.
+      if (
+        response.status === 401 &&
+        token &&
+        !path.startsWith('/api/auth/')
+      ) {
+        borrarToken()
+        window.dispatchEvent(
+          new Event(EVENTO_SESION_EXPIRADA),
+        )
+      }
+
+      const error = new Error(
         mensajeServidor ||
           `El servidor respondió con estado ${response.status}.`,
       )
+      error.status = response.status
+      error.detalles = detalles
+      throw error
     }
 
     if (response.status === 204) {
@@ -180,6 +207,63 @@ export const api = {
     })
   },
 
+  login(username, password) {
+    return request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    })
+  },
+
+  faceLogin(descriptor) {
+    return request('/api/auth/face-login', {
+      method: 'POST',
+      body: JSON.stringify({ descriptor }),
+    })
+  },
+
+  me() {
+    return request('/api/auth/me')
+  },
+
+  getUsuarios() {
+    return request('/api/usuarios')
+  },
+
+  createUsuario(datos) {
+    return request('/api/usuarios', {
+      method: 'POST',
+      body: JSON.stringify(datos),
+    })
+  },
+
+  setRostroUsuario(usuarioId, plantillas) {
+    return request(
+      `/api/usuarios/${usuarioId}/rostro`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ plantillas }),
+      },
+    )
+  },
+
+  getUbicaciones() {
+    return request('/api/ubicaciones')
+  },
+
+  setEtiquetaUsuario(usuarioId, etiqueta) {
+    return request(`/api/usuarios/${usuarioId}/etiqueta`, {
+      method: 'PUT',
+      body: JSON.stringify({ etiqueta }),
+    })
+  },
+
+  deleteRostroUsuario(usuarioId) {
+    return request(
+      `/api/usuarios/${usuarioId}/rostro`,
+      { method: 'DELETE' },
+    )
+  },
+
   getCocina() {
     return request('/api/v1/cocina')
   },
@@ -201,13 +285,19 @@ export const api = {
       () => controller.abort(),
       60000,
     )
+    const token = obtenerToken()
 
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/voz/audio-web?sesion=${encodeURIComponent(sesion)}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/wav' },
+          headers: {
+            'Content-Type': 'audio/wav',
+            ...(token
+              ? { Authorization: `Bearer ${token}` }
+              : {}),
+          },
           body: wav,
           signal: controller.signal,
         },

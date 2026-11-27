@@ -1,6 +1,6 @@
 # Trattoria Bellavista — Sistema de gestión para restaurante italiano
 
-> **Proyecto académico colaborativo** · React + Nginx · FastAPI · PostgreSQL 17 · Docker Compose
+> **Proyecto académico colaborativo** · React + Nginx · FastAPI · PostgreSQL 17 · Docker Compose  
 > **Última revisión documental:** 23 de octubre de 2026. Este README distingue entre capacidades implementadas, comprobaciones realizadas y pendientes de despliegue.
 
 ## 1. Descripción y alcance
@@ -271,6 +271,45 @@ Las imágenes que acompañan este README provienen de capturas del historial de 
 ---
 
 *Documentación elaborada a partir del código revisado en `dev`, las respuestas observadas durante la certificación local y el historial de PR. Una funcionalidad descrita en código no sustituye su prueba E2E.*
+
+---
+
+## Ingreso con reconocimiento facial
+
+El sistema exige iniciar sesión. Hay dos formas de entrar:
+
+- **Reconocimiento facial:** la pantalla de ingreso activa la cámara y compara el rostro con los usuarios registrados. El análisis se hace en el navegador con `@vladmandic/face-api`; solo se envía al servidor un descriptor numérico de 128 valores, nunca la imagen.
+- **Usuario y contraseña:** respaldo cuando la cámara no está disponible o el rostro no se reconoce.
+
+Roles: **ADMIN** (acceso total y gestión de usuarios) y **PERSONAL** (operación diaria).
+
+### Configuración
+
+1. Definir `AUTH_SECRET` en `.env` (obligatorio con Docker Compose):
+
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+
+2. Aplicar el esquema a una base existente: `database/schema.sql` (o `docker/postgres/01-schema.sql` en un volumen nuevo) crea la tabla `usuarios`.
+
+3. Crear el primer administrador:
+
+   ```bash
+   docker compose exec -e ADMIN_USERNAME=admin -e ADMIN_NOMBRE="Gerente" backend python -m app.scripts.crear_admin
+   ```
+
+   Si no se define `ADMIN_PASSWORD`, el script la pide en la terminal sin mostrarla.
+
+4. Entrar como administrador, abrir **Usuarios y acceso**, crear los usuarios y registrar el rostro de cada persona con buena iluminación.
+
+### Requisitos y limitaciones
+
+- **HTTPS o `localhost`:** los navegadores solo permiten la cámara en contextos seguros. La URL de Azure que usa `http://` no permitirá el ingreso facial hasta tener HTTPS.
+- **Sin detección de vida:** el sistema no distingue una persona real de una fotografía. Por eso la contraseña sigue siendo necesaria para los accesos sensibles.
+- **Datos biométricos:** el descriptor facial es un dato sensible. Obtener el consentimiento de cada persona antes de registrar su rostro y cumplir la normativa aplicable de protección de datos.
+- **Intentos de ingreso:** no hay límite de intentos todavía; recomendado para una siguiente iteración.
+- Las sesiones duran 8 horas (`AUTH_TOKEN_TTL_SECONDS` configurable en código) y se cierran al reiniciar el backend si `AUTH_SECRET` cambia.
 
 
 ## 12. Pedidos por voz, tablero de cocina, Grafana y terminal ESP32 (27/11/2026)

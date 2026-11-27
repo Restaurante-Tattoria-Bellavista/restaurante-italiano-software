@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import MesaDialog from '../components/MesaDialog'
 import MesasPlanoSection from '../components/MesasPlanoSection'
 import { api } from '../services/api'
+import { conectarTiempoReal } from '../services/tiempoReal'
 
 const nombresEstados = {
   LIBRE: 'Libre',
@@ -87,6 +88,23 @@ function MesasPage() {
     return () => {
       window.clearTimeout(temporizador)
     }
+  }, [])
+
+  // Tiempo real: recarga el plano cuando el backend informa cambios en mesas o su distribución.
+  const recargarRef = useRef(null)
+
+  useEffect(() => {
+    recargarRef.current = cargarMesas
+  })
+
+  useEffect(() => {
+    return conectarTiempoReal({
+      onCambio: (tablas) => {
+        if (tablas.some((tabla) => tabla.startsWith('mesa'))) {
+          recargarRef.current?.()
+        }
+      },
+    })
   }, [])
 
   function abrirCreacion() {

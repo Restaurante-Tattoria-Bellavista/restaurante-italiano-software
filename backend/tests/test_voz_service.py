@@ -27,8 +27,27 @@ def test_sesiones_se_reinician():
     assert "web-x" not in v._sesiones
 
 
-def test_audio_web_rechaza_audio_vacio():
+def _cliente():
+    """Cliente sin base de datos: las pruebas de seguridad se resuelven antes de usar la BD."""
     from fastapi.testclient import TestClient
+    from app.db.session import get_db
     from app.main import app
-    r = TestClient(app).post("/api/voz/audio-web", content=b"x", headers={"Content-Type": "audio/wav"})
-    assert r.status_code == 422
+    app.dependency_overrides[get_db] = lambda: iter([None])
+    return TestClient(app)
+
+
+def test_voz_web_exige_sesion_de_usuario():
+    c = _cliente()
+    assert c.post("/api/voz/audio-web", content=b"x" * 3000).status_code == 401
+    assert c.post("/api/voz/confirmar", json={"mesa_numero": 1, "items": []}).status_code == 401
+
+
+def test_terminal_esp32_exige_clave_de_dispositivo(monkeypatch):
+    from app.core.config import get_settings
+    c = _cliente()
+    s = get_settings()
+    monkeypatch.setattr(s, "voz_device_key", None)
+    assert c.post("/api/voz/audio", content=b"x" * 3000).status_code == 503
+    monkeypatch.setattr(s, "voz_device_key", "clave-de-prueba")
+    assert c.post("/api/voz/audio", content=b"x" * 3000).status_code == 401
+    assert c.post("/api/voz/audio", content=b"x", headers={"X-Device-Key": "clave-de-prueba"}).status_code == 422

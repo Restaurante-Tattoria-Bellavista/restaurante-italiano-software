@@ -8,7 +8,8 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.services import voz_service
 
-router = APIRouter(prefix="/api/voz", tags=["Pedidos por voz"])
+router = APIRouter(prefix="/api/voz", tags=["Pedidos por voz"])  # exige sesion (ver main.py)
+router_dispositivo = APIRouter(prefix="/api/voz", tags=["Pedidos por voz (terminal ESP32)"])  # exige X-Device-Key
 MAX_AUDIO_BYTES = 2_000_000  # ~60 s de WAV mono 16 kHz (el ESP32 envia <= 80 KB)
 
 
@@ -59,7 +60,7 @@ async def _procesar_audio(request: Request, sesion: str, db: Session):
 SESION_QUERY = Query(default="esp32", min_length=1, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
 
 
-@router.post("/audio")
+@router_dispositivo.post("/audio")
 async def interpretar_audio(
     request: Request,
     sesion: str = SESION_QUERY,
@@ -67,9 +68,12 @@ async def interpretar_audio(
     db: Session = Depends(get_db),
 ):
     """Terminal de voz (ESP32): audio WAV crudo; el borrador vive en el servidor por `sesion`.
-    Si VOZ_DEVICE_KEY esta definida, exige la cabecera X-Device-Key."""
+    Ruta sin login de usuario: se autentica solo con la cabecera X-Device-Key. Si VOZ_DEVICE_KEY
+    no esta configurada, la ruta queda cerrada (503)."""
     clave = get_settings().voz_device_key
-    if clave and not hmac.compare_digest(x_device_key or "", clave):
+    if not clave:
+        raise HTTPException(status_code=503, detail="Terminal de voz deshabilitada: falta VOZ_DEVICE_KEY.")
+    if not hmac.compare_digest(x_device_key or "", clave):
         raise HTTPException(status_code=401, detail="Clave de dispositivo invalida.")
     return await _procesar_audio(request, sesion, db)
 
@@ -80,8 +84,8 @@ async def interpretar_audio_web(
     sesion: str = SESION_QUERY,
     db: Session = Depends(get_db),
 ):
-    """Pagina web: mismo proceso que /audio pero sin clave de dispositivo (la clave no puede
-    viajar en el navegador). Queda al mismo nivel de acceso que el resto de la API."""
+    """Pagina web: mismo proceso que /audio, pero con la sesion del usuario (token) en lugar de la
+    clave de dispositivo, que no puede viajar en el navegador."""
     return await _procesar_audio(request, f"web-{sesion}"[:40], db)
 
 
