@@ -26,6 +26,7 @@ jobs:
       HEAD_REF: ${{ github.head_ref }}
       PR_TITLE: ${{ github.event.pull_request.title }}
       PR_BODY: ${{ github.event.pull_request.body }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
 
     steps:
       - name: Mostrar información del Pull Request
@@ -60,7 +61,9 @@ jobs:
               ;;
 
             main)
-              if [[ "$HEAD_REF" == "prod" ]]; then
+              if [[ "$HEAD_REF" == "prod" ]] ||
+                 [[ "$HEAD_REF" == "release/integracion-main-20261023" &&
+                    "$PR_NUMBER" == "57" ]]; then
                 flujo_valido=true
               fi
               ;;

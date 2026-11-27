@@ -7,10 +7,12 @@ services:
       POSTGRES_DB: restaurant
       POSTGRES_USER: restaurant
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configurar POSTGRES_PASSWORD en .env}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?Configurar GRAFANA_DB_PASSWORD en .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./docker/postgres/03-grafana-ro.sh:/docker-entrypoint-initdb.d/03-grafana-ro.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U restaurant -d restaurant"]
       interval: 5s
@@ -24,8 +26,14 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://restaurant:${POSTGRES_PASSWORD:?Configurar POSTGRES_PASSWORD en .env}@db:5432/restaurant
       ENVIRONMENT: production
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-flash-lite-latest}
+      VOZ_DEVICE_KEY: ${VOZ_DEVICE_KEY:-}
       AUTH_SECRET: ${AUTH_SECRET:?Configurar AUTH_SECRET en .env}
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
+    # Publicado para que el ESP32 (red local) llegue a /api/voz/audio con su X-Device-Key.
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +50,24 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
+        condition: service_healthy
+    networks: [internal]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Configurar GRAFANA_ADMIN_PASSWORD en .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?Configurar GRAFANA_DB_PASSWORD en .env}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      db:
         condition: service_healthy
     networks: [internal]
 
@@ -63,6 +89,7 @@ services:
 
 volumes:
   postgres_data:
+  grafana_data:
   caddy_data:
   caddy_config:
 

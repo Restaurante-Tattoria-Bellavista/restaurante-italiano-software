@@ -158,8 +158,20 @@ def cambiar_estado(pedido_id:int,payload:PedidoEstado,db:Session=Depends(get_db)
 
 @router.get('/cocina')
 def cocina(db:Session=Depends(get_db)):
-    return [dict(r) for r in db.execute(select(pedidos).where(pedidos.c.estado.in_(
-        ('EN_PREPARACION','LISTO'))).order_by(pedidos.c.created_at)).mappings().all()]
+    """Tablero de cocina: pedidos nuevos (ABIERTO), en preparacion y listos, con sus productos."""
+    ped = db.execute(select(pedidos, mesas.c.numero.label('mesa_numero')).join(
+        mesas, mesas.c.id == pedidos.c.mesa_id).where(pedidos.c.estado.in_(
+        ('ABIERTO','EN_PREPARACION','LISTO'))).order_by(pedidos.c.created_at)).mappings().all()
+    ids = [p['id'] for p in ped]
+    detalles = {}
+    if ids:
+        rows = db.execute(select(detalle_pedido.c.pedido_id, detalle_pedido.c.cantidad, detalle_pedido.c.observacion,
+            productos.c.nombre).join(productos, productos.c.id == detalle_pedido.c.producto_id).where(
+            detalle_pedido.c.pedido_id.in_(ids)).order_by(detalle_pedido.c.id)).mappings().all()
+        for r in rows:
+            detalles.setdefault(r['pedido_id'], []).append(
+                {'producto': r['nombre'], 'cantidad': r['cantidad'], 'observacion': r['observacion']})
+    return [{**dict(p), 'detalles': detalles.get(p['id'], [])} for p in ped]
 
 @router.get('/reportes/dashboard')
 def dashboard(db:Session=Depends(get_db)):

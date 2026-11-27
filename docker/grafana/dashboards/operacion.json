@@ -1,0 +1,240 @@
+{
+ "uid": "trattoria-ops",
+ "title": "Trattoria Bellavista - Operacion",
+ "schemaVersion": 39,
+ "version": 1,
+ "refresh": "10s",
+ "time": {
+  "from": "now-24h",
+  "to": "now"
+ },
+ "tags": [
+  "restaurante"
+ ],
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Pedidos activos",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 0
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT count(*) AS pedidos FROM pedidos WHERE estado IN ('ABIERTO','EN_PREPARACION','LISTO','ENTREGADO')"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Mesas ocupadas",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 0
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT count(*) AS mesas FROM mesas WHERE estado='OCUPADA'"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Ventas pagadas hoy",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 0
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT coalesce(sum(total),0) AS ventas FROM pedidos WHERE estado='PAGADO' AND closed_at::date=current_date"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Pedidos creados (24h)",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 18,
+    "y": 0
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT count(*) AS pedidos FROM pedidos WHERE created_at > now()-interval '24 hours'"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Pedidos por hora",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "time_series",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT date_trunc('hour',created_at) AS time, count(*) AS pedidos FROM pedidos WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "piechart",
+   "title": "Pedidos por estado",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT estado, count(*) AS total FROM pedidos GROUP BY estado"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "barchart",
+   "title": "Top productos",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 12
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT p.nombre, sum(d.cantidad) AS unidades FROM detalle_pedido d JOIN productos p ON p.id=d.producto_id GROUP BY p.nombre ORDER BY 2 DESC LIMIT 10"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "table",
+   "title": "Estado de mesas",
+   "datasource": {
+    "type": "postgres",
+    "uid": "restaurante-pg"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 12
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "postgres",
+      "uid": "restaurante-pg"
+     },
+     "format": "table",
+     "rawQuery": true,
+     "editorMode": "code",
+     "rawSql": "SELECT numero, ubicacion, capacidad, estado FROM mesas WHERE activo ORDER BY numero"
+    }
+   ]
+  }
+ ]
+}

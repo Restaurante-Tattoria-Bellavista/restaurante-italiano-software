@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # Sin valor por defecto: la URL con la contraseña debe venir de DATABASE_URL (ver .env.example).
     database_url: str = ""
     database_connect_timeout: int = 3
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-flash-lite-latest"
+    gemini_model_respaldo: str = "gemini-3.1-flash-lite"
+    voz_device_key: str | None = None
 
     # Clave para firmar los tokens de sesion. Definir AUTH_SECRET en produccion:
     # si no se define, se genera una nueva en cada arranque y las sesiones se cierran al reiniciar.

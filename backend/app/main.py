@@ -22,6 +22,8 @@ from app.routers.health import router as health_router
 from app.routers.catalogo import router as catalogo_router
 from app.routers.tiempo_real import router as tiempo_real_router
 from app.routers.ubicaciones import router as ubicaciones_router
+from app.routers.voz import router as voz_router
+from app.routers.voz import router_dispositivo as voz_dispositivo_router
 from app.core.realtime import hub
 import app.db.eventos  # noqa: F401  registra los listeners de escritura
 
@@ -52,6 +54,8 @@ def create_app() -> FastAPI:
     app.include_router(operacion_router, dependencies=proteccion)
     app.include_router(reservas_router, dependencies=proteccion)
     app.include_router(catalogo_router, dependencies=proteccion)
+    app.include_router(voz_router, dependencies=proteccion)
+    app.include_router(voz_dispositivo_router)  # se autentica con X-Device-Key
     return app
 
 
